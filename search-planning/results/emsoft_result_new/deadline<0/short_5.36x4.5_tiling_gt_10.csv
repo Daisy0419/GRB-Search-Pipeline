@@ -1,0 +1,2 @@
+method,dataset,budget,slew_rate,n_src,n_bkg,source,source_tile,detected,sum_tiles,visited_tiles,zenith_tile,sum_prob,detection_cost,estimate_time,runtime,path
+GCP,adapt_p70-52877936550931_a281-24999999999994_253_map.h5,-0.222,10,63,1691,19.471220:281.250000,1217,False,880,0,1232,0,0,0,0,
