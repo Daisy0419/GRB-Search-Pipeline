@@ -2,9 +2,7 @@
 
 This repository contains the source code, processed datasets, and analysis tools supporting the EMSOFT 2026 paper, *"Suborbital and Orbital Real-Time Localization of Gamma-Ray Bursts via Utility-Guided Coordination."*
 
-Repository: **TODO**
-
-Data: **TODO: add drive URL**
+[Repository:](https://github.com/Daisy0419/GRB-Search-Pipeline.git)
 
 ## Table of Contents
 
@@ -28,56 +26,72 @@ Data: **TODO: add drive URL**
 
 
 ## System Requirements
-**TODO**
-- OS: Linux (some instructions are Ubuntu-specific)
-- CPU: Minimum 2 cores, **8+ cores preferred** (24 physical/48 logical cores used in paper)
-- RAM: **8GB**
-- Required Storage, Option A, Docker Container: **Total: 5.6GB**
-  - Docker package install: 500MB
-  - Docker container: 5.1GB
-- Required Storage, Option B, Local Install: **Total: 4.1GB**
+- OS: Linux
+- Reference platform used in the paper: NVIDIA Jetson Orin NX
+  - 8 ARM Cortex-A78AE v8.2 CPU cores
+  - CPU frequency fixed at 1.5 GHz
+  - 16 GB DRAM
+  - GPU not used
+- Required Storage: **Total: 35GB**
   - Repo: 200MB
   - Miniconda: 800MB
   - Conda environments: 2.8GB
   - LEMON: 70MB
+  - Store Resulting maps: 30GB
+
+
+The paper's timing results are **platform-sensitive**. Functional results may be reproduced on another Linux machine, but direct comparisons with Figures 4-6 should use the reference Jetson configuration.
 
 
 ## Overview
 
-This artifact implements an on-board pipeline for localizing a gamma-ray transient and planning a follow-up optical search under an overall deadline.
+This artifact contains the software and data for offline experiments that simulate and evaluate the proposed on-board observation workflow. It does not acquire data from a live instrument or control a physical telescope.
 
-The pipeline has the following stages:
+### Proposed On-Board Workflow
 
-1. gather source and background events;
-2. evaluate the expected utility of beginning map generation;
-3. generate a HEALPix likelihood map;
-4. discretize the likelihood map into telescope-specific tiles;
-5. construct a deadline-aware search path; and
-6. evaluate whether the path images the true transient location before the deadline.
+During a real observation, the gamma-ray telescope would receive a mixture of source and background events without knowing which events came from the transient. The proposed workflow would:
 
-All code is written in Python except for the performance-critical search-planning algorithm, which is written in C++. Python code controls data processing, likelihood-map generation, utility estimation, experiment execution, result analysis, and plotting.
+1. **Gather events** after detecting a transient.
+2. **Choose when to generate a map** using the observed events, estimated background rate, overall deadline, and pre-trained utility tables.
+3. **Generate a likelihood map** representing the probable transient location.
+4. **Plan the optical search** by converting the map into telescope-FoV tiles and running the GCP planning algorithm.
+5. **Search for the transient** until it is detected or the deadline expires.
 
-### Included Components
+In the artifact, the event stream and optical search are simulated. The likelihood-mapping, utility-estimation, tiling, and GCP planning code is executed normally. Telescope movement and observation are simulated using the slew- and dwell-time models.
 
-- Python likelihood-map generation code, including the optimized in-memory and multiresolution implementation evaluated in the paper
-- Python utility-model training and runtime utility evaluation
-- Python data preparation, experiment orchestration, and result analysis
-- Python conversion of HEALPix likelihood maps into telescope FoV tiles
-- C++ implementation of Greedy Christofides Pathfinding (GCP) for deadline-aware search planning
-- Processed response and background models used by likelihood mapping
-- Training data for utility and processing-time estimation
-- Test data for the short- and long-transient scenarios
-- Precomputed results for Figures 4-11
-- A notebook or plotting entry point for reproducing the paper figures **TODO**
+### Artifact Experiment Workflow
+
+The artifact experiments consist of offline training followed by evaluation.
+
+#### Phase A: Training
+
+1. **Generate training maps.** Use all 52,800 simulated training transients in each of the short- and long-transient scenarios. Generate each map using the true transient length and record the source-event count, background-event count, and map-generation time.
+
+2. **Run search planning.** For each training map and telescope FoV, run GCP with different search budgets. Record the planning time and the minimum modeled slew-and-dwell time required to reach a tile containing the true source.
+
+3. **Build the utility tables.** Use these measurements to estimate mapping time, planning time, and detection probability as functions of the observed event counts and remaining deadline. The paper uses `20 x 20` source/background bins and confidence level `q = 0.95`.
+
+The training process uses ground-truth information because the transient locations and lengths are known in the simulation.
+
+#### Phase B: Evaluation
+
+1. Select 10,000 independent test transients.
+2. Generate maps using the deadline-oblivious policy (`nodeadline`) and the utility-guided policy for each tested deadline.
+3. Run GCP on each generated map and simulate the resulting optical search.
+4. Determine whether the search reaches a tile containing the true source before the deadline.
+5. Aggregate the mapping errors, processing times, and detection probabilities across the test set.
+
+The provided training tables reproduce the measurements obtained on the Jetson platform. To calibrate the utility estimator for different hardware, users should remeasure the platform-dependent mapping and planning times and rebuild the utility tables. The simulated transient datasets themselves do not need to be regenerated.
+
 
 ### Directory Structure
-
-The intended high-level organization is shown below. Exact internal Python filenames should be added only after the repository layout is finalized.
 
 ```text
 .
 |
-|-- map_generation/                 # Python: likelihood mapping
+|-- cosipy/                 # Python: likelihood mapping
+|   |-- cosipy/    
+|   |   |-- ts_map/         # key workdir      
 |
 |-- search_planning/                # Follow-up tiling and search planning
 |   |-- include/                    # C++ header files, if used
@@ -105,73 +119,38 @@ The intended high-level organization is shown below. Exact internal Python filen
 |   |-- recomputed_results/         # Outputs from rerunning experiments
 |   `-- [visualization code]        # TODO: add notebook script 
 |
-|-- configuration.yml           # TODO: add python configuration file
+|-- cosipy-312-deps.yml             # python environment configuration file
 `-- README.md
 ```
 
 ## 1 Environment Setup
 
-You can run the artifact via **Docker (recommended)** or a **Local Setup**. 
+### 1.1 Local Installation
 
-### 1.1 Option A: Using the Provided Docker Container
-
-You may install Docker according to [these instructions](https://docs.docker.com/engine/install/). Here, we include the instructions for Ubuntu distributions:
-
-#### 1.1.1 Install Docker
-
-1. Set up Docker's `apt` repository:
-
-```bash
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-  https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-```
-
-2. Install the latest Docker packages.
-
-```bash
-sudo apt-get install docker-ce docker-ce-cli \
-  containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
-#### 1.1.2 Pull the Docker Image
-<!-- ```bash
-sudo docker pull ghcr.io/daisy0419/rtss25-op-solver:1.0
-``` -->
-**TODO: docker**
-All dependencies are pre-installed, and project binaries are precompiled in the image. You can jump to Reproducing Paper Figures or Running Full Experiments.
-
-
-### 1.2 (Option B) Local Installation
-
-#### 1.2.1 Clone Repository
+#### 1.1.1 Clone Repository
 
 Clone the repository to the path of your choice. All commands listed hereafter assume it is placed directly into your home directory.
 
+Clone the main repository:
 ```bash
 cd ~
-git clone -b rtss2025_artifact https://github.com/Daisy0419/Telescope-Searching-Problem/
+git clone https://github.com/Daisy0419/GRB-Search-Pipeline.git
 ```
 
-#### 1.2.2 Python Environment Setup
+Clone the map generation code:
+```bash
+cd ~/GRB-Search-Pipeline
+git clone -b tsmap-artifact https://github.com/McKelvey-Engineering-CSE/cosipy.git
+```
+
+#### 1.1.2 Python Environment Setup
 
 We recommend setting up a [conda](https://docs.conda.io/en/latest/) environment for Python.
 
 If you do not have conda installed locally:
 
 ```bash
-cd ~/Telescope-Search-Problem
+cd ~/GRB-Search-Pipeline
 ```
 Download and install Miniconda (change ~/conda to your preferred location)
 ```bash
@@ -188,44 +167,18 @@ conda config --system --set channel_priority flexible
 ```
 Once conda is available, create the python environments using provided yaml files:
 ```bash
-conda env create -f rtss25-sky-tiling.yml
-conda env create -f rtss25-telescope-search.yml
+conda env create -f cosipy-312-deps.yml
 ```
 
-Activate **rtss25-sky-tiling** before running tiling scripts or **rtss25-telescope-search** before running all other scripts:
+Activate **cosipy-312** map generation all other scripts:
 ```bash
-conda activate rtss25-sky-tiling
-# or
-conda activate rtss25-telescope-search
+conda activate cosipy-312
 ```
 
 ---
-#### 1.2.3 C++ Environment Setup
+#### 1.1.3 C++ Environment Setup
 
-**(1) Gurobi Optimizer (Required)**
-
-The Gurobi Optimizer is used to solve our ILP approach to the orienteering problem.
-
-1. Download and extract Gurobi to the directory of your choice. All commands listed hereafter assume it is placed directly in your home directory.
-
-```bash
-cd ~
-wget https://packages.gurobi.com/12.0/gurobi12.0.3_linux64.tar.gz
-tar xvfz gurobi12.0.3_linux64.tar.gz
-```
-
-2. Set the necessary environment variables in your shell (change `~/gurobi1203` to your preferred location).
-
-```bash
-export GUROBI_HOME=~/gurobi1203/linux64
-export PATH="${GUROBI_HOME}/bin:$PATH"
-export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:$LD_LIBRARY_PATH"
-```
-
-**Note**: If you don't have Gurobi license and you do not plan to run experiments involving Gurobi, you still need to install Gurobi in order to compile the project code (due to build-time linking requirements).
-
-
-#### (2) LEMON Graph Library (Required)
+**(1) LEMON Graph Library (Required)**
 
 The Lemon Graph Library is used to compute the minimum-weight perfect matching used in our Greedy Christofides Pathfinding algorithm. 
 
@@ -248,49 +201,115 @@ export LEMON_SOURCE_DIR=~/lemon-1.3.1
 export LEMON_BUILD_DIR=~/lemon-1.3.1/build
 ```
 
-**(3) Build the C++ Executables**
+**(2) HDF5 Library (Required)**
 
-Once all dependencies are installed, you can build the C++ project with:
+The search-planning code reads likelihood maps stored in HDF5 files. Install [HDF5](https://github.com/HDFGroup/hdf5) under your home directory so that administrator privileges are not required.
+
+Download, build, and install HDF5:
 
 ```bash
-cd ~/Telescope-Search-Problem
-mkdir build && cd build
-cmake ..
-make -j
+cd ~
+git clone --depth 1 https://github.com/HDFGroup/hdf5.git hdf5-source
+
+cmake -S ~/hdf5-source -B ~/hdf5-build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="${HOME}/hdf5" \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_TESTING=OFF \
+    -DHDF5_BUILD_EXAMPLES=OFF \
+    -DHDF5_BUILD_CPP_LIB=ON \
+    -DHDF5_BUILD_HL_LIB=ON
+
+cmake --build ~/hdf5-build -j
+cmake --install ~/hdf5-build
 ```
 
-This produces two binaries in `build/`. The only difference between them is the `main` function:
-- **ts** — built from `src/main.cpp`. Entry point for batch experiments used in the paper, invoked by the Python scripts in `results/`.
-- **op** — built from `src/main_custom.cpp`. Entry point for single-case runs, one algorithm on one (skymap, budget, slewrate) instance.
+Configure the HDF5 environment variables:
+
+```bash
+export HDF5_ROOT="${HOME}/hdf5"
+export LD_LIBRARY_PATH="${HDF5_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+```
+
+Verify the installation:
+
+```bash
+ls "${HDF5_ROOT}/include/hdf5.h"
+ls "${HDF5_ROOT}"/lib/libhdf5*
+```
+
+---
+
+**(3) HighFive Library (Required)**
+
+[HighFive](https://github.com/highfive-devs/highfive) is a header-only C++ interface to HDF5. It does not need to be compiled, but its header files must be available when building the search-planning code.
+
+Clone HighFive into your home directory:
+
+```bash
+cd ~
+git clone --depth 1 --recursive \
+    https://github.com/highfive-devs/highfive.git HighFive
+```
+
+Configure the HighFive path:
+
+```bash
+export HIGHFIVE_ROOT="${HOME}/HighFive"
+```
+
+Verify that the required headers are present:
+
+```bash
+ls "${HIGHFIVE_ROOT}/include/highfive/H5File.hpp"
+```
+
+HighFive is header-only, no separate build or installation step is required.
+
+---
+
+**(4) Build the C++ Executables**
+
+Once all dependencies are installed, build the C++ project with:
+
+```bash
+cd ~/GRB-Search-Pipeline/search-planning
+
+export HDF5_ROOT="${HOME}/hdf5"
+export HIGHFIVE_ROOT="${HOME}/HighFive"
+export LEMON_SOURCE_DIR="${HOME}/lemon-1.3.1"
+export LEMON_BUILD_DIR="${LEMON_SOURCE_DIR}/build"
+export LD_LIBRARY_PATH="${HDF5_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+
+cmake -S . -B build
+cmake --build build -j
+```
+
+This produces two binaries in `build/`. Both are compiled from `src/main.cpp` and share the same search-planning implementation. CMake selects a different entry point for each binary:
+
+- **`sp_train`** — compiled with `BUILD_SP_TRAIN` and dispatches to `main_train()`. It processes training maps and produces search-outcome training data.
+- **`sp_verify`** — compiled with `BUILD_SP_VERIFY` and dispatches to `main_verify()`. It processes evaluation maps and records whether the simulated search reaches the source before the deadline.
+
+Verify that both binaries were created:
+
+```bash
+ls build/sp_train build/sp_verify
+```
 
 --- 
 
 ## 2 Reproducing Paper Figures
 
-You can visualize the results via Jupyter notebook either via **container** or **locally**.
+You can visualize the results via Jupyter notebook.
 
-### 2.1 Run Jupyter Notebook via Docker Container
-```bash
-sudo docker run --rm -it -p 8888:8888 \
-  -v "$PWD:/workspace" \
-  ghcr.io/daisy0419/rtss25-op-solver:1.0 \
-  bash -lc 'conda run -n rtss25-telescope-search \
-    jupyter lab --ip=0.0.0.0 --port=8888 --no-browser \
-      --IdentityProvider.token="" \
-      --ServerApp.root_dir=/workspace \
-      --allow-root'
-```
-
-Then open http://localhost:8888 and navigate to **results/visualize_results.ipynb** in the sidebar.
-
-### 2.2 Run Jupyter notebook Locally
+### 2.2 Run Jupyter notebook 
 
 ```bash
-conda activate rtss25-telescope-search
-cd ~/Telescope-Searching-Problem/results
+conda activate cosipy-312
+cd ~/GRB-Search-Pipeline/results
 jupyter notebook visualize_results.ipynb
 ```
-
 
 ### 2.3 Reproducing Results and Figures in the Jupyter Notebook
 
@@ -312,72 +331,262 @@ Figures 1-3 are explanatory diagrams rather than outputs of the main experimenta
 
 ## 3 Running Full Experiments
 
-The full experiments are substantially more expensive than reproducing plots from precomputed result tables. The artifact should therefore provide both a small validation run and the complete experiment path.
+The full experiment has two phases:
 
-### 3.1 Set Up the Run Environment
+1. **Offline training:** generate training maps, measure mapping and planning times, and collect the training data used by the utility estimator.
+2. **Evaluation:** generate maps for 10,000 test transients, run search planning, simulate the optical search, and calculate the success probability.
 
-#### 3.1.1 Run Experiments in the Docker Container
+The full experiment is computationally expensive. To reproduce only the paper figures using the distributed results, skip this section and follow [Section 2](#2-reproducing-paper-figures).
 
-**TODO**
+### 3.1 Selecting an Experiment Workflow
 
-#### 3.1.2 Run Experiments Locally
+There are two ways to run the experiments:
 
-**TODO**
+- To reproduce the complete training and evaluation process, follow both Phase A and Phase B.
+- To evaluate the policies using the distributed training data, skip Phase A and begin with Phase B.
 
-### 3.2 Regenerate Pipeline Inputs
+### 3.2 Phase A: Generate the Offline Training Data
 
-#### 3.2.1 Obtain the Response and Background Models
+The paper uses 52,800 training transients for each transient scenario. All training transients in the specified directory are processed.
 
-**TODO** 
+#### Step 1: Configure Paths
 
-#### 3.2.2 Generate Likelihood Maps
+Activate the Python environment:
 
-**TODO** 
-
-#### 3.2.3 Train the Utility Models
-
-**TODO** 
-
-#### 3.2.4 Generate Telescope Tilings
-
-**TODO** 
-
-### 3.3 Rerun the Experiments
-
-#### Running Time
-
-| Experiment path | Expected time |
-| --- | ---: |
-| Reproduce Figures 4-11 from precomputed tables | **TODO** |
-| Small smoke test of the integrated pipeline | **TODO** |
-| Utility-model training measurements | About one day on the reference Jetson; confirm final artifact time |
-| Complete end-to-end test experiments | **TODO** |
-
-If a single command reruns all experiments, provide it here:
-
-```text
-TODO: insert the actual command.
+```bash
+conda activate cosipy-312
 ```
 
-The complete workflow should not overwrite `results/precomputed_results/`. Newly generated results should be placed under `results/recomputed_results/`.
+Configure the paths for the map-generation script, models, training transients, and output directories:
 
-#### 3.3.1 Mapping-Implementation Benchmark (Figure 4)
+```bash
+export MAP_SCRIPT=~/cosipy/cosipy/ts_map/map_adapt_transients.py
 
-#### 3.3.2 Mapping and Search-Planning Times (Figures 5-6)
+export RESPONSE_MODEL=/shared/models/adapt_response_with_area.h5
+export BACKGROUND_MODEL=/shared/models/adapt_bkg_model.h5
+
+export SHORT_TRAINING_TRANSIENTS="/path/to/short/training/transients"  # TODO
+export LONG_TRAINING_TRANSIENTS="/path/to/long/training/transients"    # TODO
+
+export OUTPUT_ROOT=~/GRB-Search-Pipeline/results/recomputed_results
+export TRAINING_MAP_ROOT="${OUTPUT_ROOT}/training/maps"
+export TRAINING_STATS_ROOT="${OUTPUT_ROOT}/training/mapping_stats"
+export LOG_ROOT="${OUTPUT_ROOT}/logs"
+
+mkdir -p "${TRAINING_STATS_ROOT}" "${LOG_ROOT}"
+```
+
+Here:
+
+- `RESPONSE_MODEL` must point to `adapt_response_with_area.h5`.
+- `BACKGROUND_MODEL` must point to `adapt_bkg_model.h5`.
+- `SHORT_TRAINING_TRANSIENTS` and `LONG_TRAINING_TRANSIENTS` must point to the corresponding directories of simulated training transients.
+- The map output directories are created automatically by `map_adapt_transients.py` if they do not already exist.
+
+#### Step 2: Generate the Short-Transient Training Maps
+
+Run:
+
+```bash
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    "${SHORT_TRAINING_TRANSIENTS}" \
+    gt \
+    -m \
+    -o "${TRAINING_MAP_ROOT}/short" \
+    > "${TRAINING_STATS_ROOT}/short_mapping_time_stats.csv" \
+    2> "${LOG_ROOT}/short_training_maps.log"
+```
+
+The options specify:
+
+- `-t 8`: use eight map-generation threads;
+- `-n 64`: generate maps with HEALPix `nside = 64`;
+- `gt`: use the true transient duration as the event-gathering endpoint;
+- `-m`: write the generated maps to disk; and
+- `-o`: select the map output directory.
+
+No `-s` option is supplied during training, so the script processes every transient in the training directory.
+
+The script writes one row of statistics for each processed transient to standard output. Redirecting standard output creates `short_mapping_time_stats.csv`, which contains information including the source-event count, background-event count, gathering time, and measured map-generation time.
+
+The `gt` endpoint uses known source information only because this is an offline simulation for constructing the training data.
+
+#### Step 3: Generate the Long-Transient Training Maps
+
+Run the same command using the long-transient training directory:
+
+```bash
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    "${LONG_TRAINING_TRANSIENTS}" \
+    gt \
+    -m \
+    -o "${TRAINING_MAP_ROOT}/long" \
+    > "${TRAINING_STATS_ROOT}/long_mapping_time_stats.csv" \
+    2> "${LOG_ROOT}/long_training_maps.log"
+```
+
+The likelihood maps are independent of the optical telescope FoV. Therefore, each training map needs to be generated only once, even though search planning is evaluated with multiple FoVs.
+
+#### Step 4: Run GCP on the Training Maps
+
+Run the C++ GCP training program on every generated map for each transient scenario and telescope FoV where the tiling files are pregenerated.
+
+Run this procedure for:
+- short transients with the `2.5 x 2.5` FoV;
+- short transients with the `5.36 x 4.5` FoV;
+- long transients with the `2.5 x 2.5` FoV;
+- long transients with the `5.36 x 4.5` FoV.
+
+run "python run_training.py" and it will generate the trainning data for the above four cases:
+
+The output will be and they will be stored in result/
+
+```text
+short_2.5 x 2.5_tiling.csv
+short_5.36x4.5_tiling.csv
+lonnglow_2.5 x 2.5_tiling.csv
+lonnglow_5.36x4.5_tiling.csv
+```
 
 
-#### 3.3.3 Likelihood-Mapping Behavior (Figures 7-8)
+The mapping statistics and GCP outcomes have different roles:
+
+- `short_mapping_time_stats.csv` contains the training measurements used to predict map-generation time.
+- `short_5.36x4.5_tiling.csv` contains the search outcomes used to estimate the probability of reaching the source within a given search budget.
 
 
-#### 3.3.4 Utility Decisions and Mapping Error (Figures 9-10)
+### 3.3 Phase B: Evaluate the Policies
 
+The evaluation uses 10,000 test transients for each transient scenario. The script's default random seed selects the same test transients used in the paper.
 
-#### 3.3.5 End-to-End Detection Success (Figure 11)
+#### Step 5: Configure the Evaluation Inputs
 
+Set the test directory and select the training files for the transient scenario and FoV being evaluated:
 
-### 3.4 Visualizing Recomputed Results
+```bash
+export TEST_TRANSIENTS="/path/to/test/transients"                 # TODO
+export TRAINING_TIMES_FILE="/path/to/mapping_time_stats.csv"      # TODO
+export TRAINING_OUTCOMES_FILE="/path/to/search_outcomes.csv"      # TODO
 
+export TEST_MAP_ROOT="${OUTPUT_ROOT}/test/maps"
+export TEST_STATS_ROOT="${OUTPUT_ROOT}/test/mapping_stats"
 
+mkdir -p "${TEST_STATS_ROOT}"
+```
 
-## 4 Extensibility of Experiments
+Here:
 
+- `TRAINING_TIMES_FILE` is the mapping-statistics file generated during Phase A, such as `short_mapping_time_stats.csv`.
+- `TRAINING_OUTCOMES_FILE` is the output of the GCP training experiments for the selected scenario and FoV, such as `short_5.36x4.5_tiling.csv`.
+
+If the distributed training data are used, these variables should instead point to the corresponding files in:
+
+```text
+/shared/training/emsoft_data/
+```
+
+#### Step 6: Generate Utility-Guided Test Maps
+
+Set the deadline, map output directory, and statistics output file:
+
+```bash
+export DEADLINE=10
+export TEST_MAP_DIR="${TEST_MAP_ROOT}/short/5.36x4.5/${DEADLINE}"
+export TEST_STATS_FILE="${TEST_STATS_ROOT}/short_5.36x4.5_${DEADLINE}.csv"
+```
+
+Generate the test maps:
+
+```bash
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    -s 10000 \
+    --training-times "${TRAINING_TIMES_FILE}" \
+    --training-outcomes "${TRAINING_OUTCOMES_FILE}" \
+    "${TEST_TRANSIENTS}" \
+    "${DEADLINE}" \
+    -m \
+    -o "${TEST_MAP_DIR}" \
+    > "${TEST_STATS_FILE}" \
+    2> "${LOG_ROOT}/test_${DEADLINE}.log"
+```
+
+For the utility-guided policy, `DEADLINE` is the overall deadline in seconds. Repeat the command for every deadline and FoV evaluated in the paper.
+
+The short-transient deadlines are:
+
+```text
+10, 15, 20, 25, 30, 35, 40, 45, and 50 seconds
+```
+
+The long-transient deadlines are:
+
+```text
+30, 40, 50, 60, 70, 80, 90, 100, and 110 seconds
+```
+
+The training-outcomes file is FoV-specific. Therefore, utility-guided maps must be generated separately for each FoV.
+
+As in training, the script writes the test statistics to standard output. These statistics must be saved because they include the selected gathering time and measured map-generation time for each test transient.
+
+#### Step 7: Generate Deadline-Oblivious Test Maps
+
+Use `nodeadline` instead of an integer deadline to generate the deadline-oblivious baseline:
+
+```bash
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    -s 10000 \
+    "${TEST_TRANSIENTS}" \
+    nodeadline \
+    -m \
+    -o "${TEST_MAP_ROOT}/short/nodeadline" \
+    > "${TEST_STATS_ROOT}/short_nodeadline.csv" \
+    2> "${LOG_ROOT}/short_nodeadline.log"
+```
+
+The deadline-oblivious policy does not use the utility training files. Its maps are also independent of the telescope FoV and therefore need to be generated only once per transient scenario.
+
+Optionally, replace `nodeadline` with `gt` to generate ground-truth test maps for reference.
+
+#### Step 8: Run GCP and Simulate the Search
+
+For each generated test map:
+
+1. read its gathering and mapping times from the corresponding statistics CSV;
+2. subtract those times from the overall deadline;
+3. run GCP and measure its planning time;
+4. subtract the planning time from the remaining search budget;
+5. simulate following the planned path using the telescope slew, settling, and dwell-time models; and
+6. record whether the path reaches the true source tile before the deadline.
+
+```text
+TODO: Insert the exact GCP evaluation command after the sp_verify
+command-line interface has been finalized.
+```
+
+Run this step for both transient scenarios, both FoVs, and every evaluated policy and deadline. Store the newly generated results under:
+
+```text
+results/recomputed_results/
+```
+
+Do not overwrite the distributed results under:
+
+```text
+results/precomputed_results/
+```
