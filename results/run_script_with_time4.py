@@ -191,173 +191,173 @@ if __name__ == "__main__":
 
 
 
-#     #short
-#     map_path_ = "/shared/valid_tests/no-fov/emsoft_maps"
-#     map_stats_ = "/shared/valid_tests/no-fov/emsoft_stats"
-#     tile_path = "../data/tilings"
-#     source_tile_dir = "../data/source_tile_short"  
-#     map_types = ['nodeadline', 'gt']
-#     deadlines = [10, 15, 20, 25, 30, 35, 40, 45, 50]
+    #short
+    map_path_ = "/shared/valid_tests/no-fov/emsoft_maps"
+    map_stats_ = "/shared/valid_tests/no-fov/emsoft_stats"
+    tile_path = "../data/tilings"
+    source_tile_dir = "../data/source_tile_short"  
+    map_types = ['nodeadline', 'gt']
+    deadlines = [10, 15, 20, 25, 30, 35, 40, 45, 50]
 
 
 
-#     for maps in map_types:
-#         map_path = f"{map_path_}_{maps}"
-#         map_stats = f"{map_stats_}_{maps}.csv"
-#         skymaps = getFiles(map_path)
+    for maps in map_types:
+        map_path = f"{map_path_}_{maps}"
+        map_stats = f"{map_stats_}_{maps}.csv"
+        skymaps = getFiles(map_path)
 
-#         # Build a lookup: map_file -> {wait_time, mapping_time, ...}
-#         time_results = match_csv_to_maps(map_stats, map_path)
-#         time_lookup = {}
-#         for r in time_results:
-#             if r['map_file'] is not None:
-#                 # Key by the basename so we can match against skymap names
-#                 basename = os.path.splitext(os.path.basename(r['map_file']))[0]
-#                 time_lookup[basename] = r
-
-        
-#         for deadline in deadlines:
-#             for tiling_file in tilefiles:
-#                 tiling_path = os.path.join(tile_path, tiling_file)
-#                 tiling = os.path.splitext(tiling_file)[0]
-#                 source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
-#                 source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
-
-#                 for skymap in skymaps:
-#                     source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
-#                     dataset = os.path.join(map_path, f"{skymap}.h5")
-
-#                     if skymap not in time_lookup:
-#                         print(f"WARNING: no time info for {skymap}, skipping")
-#                         continue
-
-#                     info = time_lookup[skymap]
-#                     mapping_time = info['mapping_time']
-#                     waiting_time = info['wait_time']
-#                     remain_time = deadline - mapping_time - waiting_time
-
-#                     print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
-#                     run(EXECUTABLE, dataset, tiling_path, source_tile,
-#                         w_max, w_acc, remain_time, is_deepslow)
-
-#                 new_result_name = f"short_{tiling}_{maps}_{deadline}.csv"
-#                 # os.rename(result_file, new_result_name)
-#                 if os.path.exists(result_file):
-#                     os.rename(result_file, new_result_name)
-
-
-
-    # #longlow utility
-    # map_path_ = "/shared/valid_tests/2.5x2.5_longlow/emsoft_maps"
-    # map_stats_ = "/shared/valid_tests/2.5x2.5_longlow/emsoft_stats"
-    # tile_path = "../data/tilings"
-    # source_tile_dir = "../data/source_tile_longlow"  
-
-    # w_max = 10
-    # w_acc = 10
-    # is_deepslow = 0
-
-    # deadlines = [30, 40, 50, 60, 70, 80, 90, 100, 110]
-
-    # for deadline in deadlines:
-    #     map_path = f"{map_path_}_{deadline}"
-    #     map_stats = f"{map_stats_}_{deadline}.csv"
-    #     skymaps = getFiles(map_path)
-
-    #     # Build a lookup: map_file -> {wait_time, mapping_time, ...}
-    #     time_results = match_csv_to_maps(map_stats, map_path)
-    #     time_lookup = {}
-    #     for r in time_results:
-    #         if r['map_file'] is not None:
-    #             # Key by the basename so we can match against skymap names
-    #             basename = os.path.splitext(os.path.basename(r['map_file']))[0]
-    #             time_lookup[basename] = r
+        # Build a lookup: map_file -> {wait_time, mapping_time, ...}
+        time_results = match_csv_to_maps(map_stats, map_path)
+        time_lookup = {}
+        for r in time_results:
+            if r['map_file'] is not None:
+                # Key by the basename so we can match against skymap names
+                basename = os.path.splitext(os.path.basename(r['map_file']))[0]
+                time_lookup[basename] = r
 
         
+        for deadline in deadlines:
+            for tiling_file in tilefiles:
+                tiling_path = os.path.join(tile_path, tiling_file)
+                tiling = os.path.splitext(tiling_file)[0]
+                source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
+                source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
 
-    #     for tiling_file in tilefiles:
-    #         tiling_path = os.path.join(tile_path, tiling_file)
-    #         tiling = os.path.splitext(tiling_file)[0]
-    #         source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
-    #         source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
+                for skymap in skymaps:
+                    source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
+                    dataset = os.path.join(map_path, f"{skymap}.h5")
 
-    #         for skymap in skymaps:
-    #             source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
-    #             dataset = os.path.join(map_path, f"{skymap}.h5")
+                    if skymap not in time_lookup:
+                        print(f"WARNING: no time info for {skymap}, skipping")
+                        continue
 
-    #             if skymap not in time_lookup:
-    #                 print(f"WARNING: no time info for {skymap}, skipping")
-    #                 continue
+                    info = time_lookup[skymap]
+                    mapping_time = info['mapping_time']
+                    waiting_time = info['wait_time']
+                    remain_time = deadline - mapping_time - waiting_time
 
-    #             info = time_lookup[skymap]
-    #             mapping_time = info['mapping_time']
-    #             waiting_time = info['wait_time']
-    #             remain_time = deadline - mapping_time - waiting_time
+                    print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
+                    run(EXECUTABLE, dataset, tiling_path, source_tile,
+                        w_max, w_acc, remain_time, is_deepslow)
 
-    #             print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
-    #             run(EXECUTABLE, dataset, tiling_path, source_tile,
-    #                 w_max, w_acc, remain_time, is_deepslow)
-
-    #         new_result_name = f"longlow_{tiling}_utility_{deadline}.csv"
-    #         # os.rename(result_file, new_result_name)
-    #         if os.path.exists(result_file):
-    #             os.rename(result_file, new_result_name)
-
-
-
-    # #longlow
-    # map_path_ = "/shared/valid_tests/no-fov_longlow/emsoft_maps"
-    # map_stats_ = "/shared/valid_tests/no-fov_longlow/emsoft_stats"
-    # tile_path = "../data/tilings"
-    # source_tile_dir = "../data/source_tile_longlow"  
-    # map_types = ['nodeadline', 'gt']
-    # deadlines = [30, 40, 50, 60, 70, 80, 90, 100, 110]
+                new_result_name = f"short_{tiling}_{maps}_{deadline}.csv"
+                # os.rename(result_file, new_result_name)
+                if os.path.exists(result_file):
+                    os.rename(result_file, new_result_name)
 
 
 
-    # for maps in map_types:
-    #     map_path = f"{map_path_}_{maps}"
-    #     map_stats = f"{map_stats_}_{maps}.csv"
-    #     skymaps = getFiles(map_path)
+    #longlow utility
+    map_path_ = "/shared/valid_tests/2.5x2.5_longlow/emsoft_maps"
+    map_stats_ = "/shared/valid_tests/2.5x2.5_longlow/emsoft_stats"
+    tile_path = "../data/tilings"
+    source_tile_dir = "../data/source_tile_longlow"  
 
-    #     # Build a lookup: map_file -> {wait_time, mapping_time, ...}
-    #     time_results = match_csv_to_maps(map_stats, map_path)
-    #     time_lookup = {}
-    #     for r in time_results:
-    #         if r['map_file'] is not None:
-    #             # Key by the basename so we can match against skymap names
-    #             basename = os.path.splitext(os.path.basename(r['map_file']))[0]
-    #             time_lookup[basename] = r
+    w_max = 10
+    w_acc = 10
+    is_deepslow = 0
+
+    deadlines = [30, 40, 50, 60, 70, 80, 90, 100, 110]
+
+    for deadline in deadlines:
+        map_path = f"{map_path_}_{deadline}"
+        map_stats = f"{map_stats_}_{deadline}.csv"
+        skymaps = getFiles(map_path)
+
+        # Build a lookup: map_file -> {wait_time, mapping_time, ...}
+        time_results = match_csv_to_maps(map_stats, map_path)
+        time_lookup = {}
+        for r in time_results:
+            if r['map_file'] is not None:
+                # Key by the basename so we can match against skymap names
+                basename = os.path.splitext(os.path.basename(r['map_file']))[0]
+                time_lookup[basename] = r
 
         
-    #     for deadline in deadlines:
-    #         for tiling_file in tilefiles:
-    #             tiling_path = os.path.join(tile_path, tiling_file)
-    #             tiling = os.path.splitext(tiling_file)[0]
-    #             source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
-    #             source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
 
-    #             for skymap in skymaps:
-    #                 source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
-    #                 dataset = os.path.join(map_path, f"{skymap}.h5")
+        for tiling_file in tilefiles:
+            tiling_path = os.path.join(tile_path, tiling_file)
+            tiling = os.path.splitext(tiling_file)[0]
+            source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
+            source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
 
-    #                 if skymap not in time_lookup:
-    #                     print(f"WARNING: no time info for {skymap}, skipping")
-    #                     continue
+            for skymap in skymaps:
+                source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
+                dataset = os.path.join(map_path, f"{skymap}.h5")
 
-    #                 info = time_lookup[skymap]
-    #                 mapping_time = info['mapping_time']
-    #                 waiting_time = info['wait_time']
-    #                 remain_time = deadline - mapping_time - waiting_time
+                if skymap not in time_lookup:
+                    print(f"WARNING: no time info for {skymap}, skipping")
+                    continue
 
-    #                 print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
-    #                 run(EXECUTABLE, dataset, tiling_path, source_tile,
-    #                     w_max, w_acc, remain_time, is_deepslow)
+                info = time_lookup[skymap]
+                mapping_time = info['mapping_time']
+                waiting_time = info['wait_time']
+                remain_time = deadline - mapping_time - waiting_time
 
-    #             new_result_name = f"longlow_{tiling}_{maps}_{deadline}.csv"
-    #             # os.rename(result_file, new_result_name)
-    #             if os.path.exists(result_file):
-    #                 os.rename(result_file, new_result_name)
+                print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
+                run(EXECUTABLE, dataset, tiling_path, source_tile,
+                    w_max, w_acc, remain_time, is_deepslow)
+
+            new_result_name = f"longlow_{tiling}_utility_{deadline}.csv"
+            # os.rename(result_file, new_result_name)
+            if os.path.exists(result_file):
+                os.rename(result_file, new_result_name)
+
+
+
+    #longlow
+    map_path_ = "/shared/valid_tests/no-fov_longlow/emsoft_maps"
+    map_stats_ = "/shared/valid_tests/no-fov_longlow/emsoft_stats"
+    tile_path = "../data/tilings"
+    source_tile_dir = "../data/source_tile_longlow"  
+    map_types = ['nodeadline', 'gt']
+    deadlines = [30, 40, 50, 60, 70, 80, 90, 100, 110]
+
+
+
+    for maps in map_types:
+        map_path = f"{map_path_}_{maps}"
+        map_stats = f"{map_stats_}_{maps}.csv"
+        skymaps = getFiles(map_path)
+
+        # Build a lookup: map_file -> {wait_time, mapping_time, ...}
+        time_results = match_csv_to_maps(map_stats, map_path)
+        time_lookup = {}
+        for r in time_results:
+            if r['map_file'] is not None:
+                # Key by the basename so we can match against skymap names
+                basename = os.path.splitext(os.path.basename(r['map_file']))[0]
+                time_lookup[basename] = r
+
+        
+        for deadline in deadlines:
+            for tiling_file in tilefiles:
+                tiling_path = os.path.join(tile_path, tiling_file)
+                tiling = os.path.splitext(tiling_file)[0]
+                source_tile_csv = os.path.join(source_tile_dir, f"source_tiles_{tiling}.csv")
+                source_tile_lookup = pd.read_csv(source_tile_csv).set_index("map")
+
+                for skymap in skymaps:
+                    source_tile = source_tile_lookup.loc[f"{skymap}.h5", "RightTile"]
+                    dataset = os.path.join(map_path, f"{skymap}.h5")
+
+                    if skymap not in time_lookup:
+                        print(f"WARNING: no time info for {skymap}, skipping")
+                        continue
+
+                    info = time_lookup[skymap]
+                    mapping_time = info['mapping_time']
+                    waiting_time = info['wait_time']
+                    remain_time = deadline - mapping_time - waiting_time
+
+                    print(f"dataset: {dataset}, remain_time: {remain_time:.3f}")
+                    run(EXECUTABLE, dataset, tiling_path, source_tile,
+                        w_max, w_acc, remain_time, is_deepslow)
+
+                new_result_name = f"longlow_{tiling}_{maps}_{deadline}.csv"
+                # os.rename(result_file, new_result_name)
+                if os.path.exists(result_file):
+                    os.rename(result_file, new_result_name)
 
 
 

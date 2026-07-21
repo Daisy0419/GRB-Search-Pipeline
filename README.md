@@ -437,30 +437,74 @@ The likelihood maps are independent of the optical telescope FoV. Therefore, eac
 
 #### Step 4: Run GCP on the Training Maps
 
-Run the C++ GCP training program on every generated map for each transient scenario and telescope FoV where the tiling files are pregenerated.
+Run GCP on every generated training map for the following four scenario/FoV combinations:
 
-Run this procedure for:
 - short transients with the `2.5 x 2.5` FoV;
 - short transients with the `5.36 x 4.5` FoV;
-- long transients with the `2.5 x 2.5` FoV;
+- long transients with the `2.5 x 2.5` FoV; and
 - long transients with the `5.36 x 4.5` FoV.
 
-run "python run_training.py" and it will generate the trainning data for the above four cases:
-
-The output will be and they will be stored in result/
+The required tiling and true-source lookup files are pre-generated and stored under:
 
 ```text
-short_2.5 x 2.5_tiling.csv
-short_5.36x4.5_tiling.csv
-lonnglow_2.5 x 2.5_tiling.csv
-lonnglow_5.36x4.5_tiling.csv
+search-planning/tilings/
+├── tiling_files/
+│   ├── 2.5x2.5_tiling.csv
+│   └── 5.36x4.5_tiling.csv
+└── source_tile_train/
+    ├── source_tiles_2.5x2.5_short.csv
+    ├── source_tiles_5.36x4.5_short.csv
+    ├── source_tiles_2.5x2.5_longlow.csv
+    └── source_tiles_5.36x4.5_longlow.csv
 ```
 
+Before running the experiment, open `run_training.py` and check the configuration section at the beginning of the file. In particular, verify:
 
-The mapping statistics and GCP outcomes have different roles:
+```python
+FOVS = ["2.5x2.5", "5.36x4.5"]
 
-- `short_mapping_time_stats.csv` contains the training measurements used to predict map-generation time.
-- `short_5.36x4.5_tiling.csv` contains the search outcomes used to estimate the probability of reaching the source within a given search budget.
+TRAINING_MAP_DIRS = {
+    "short":  # path to the short-transient training maps
+    "longlow":  # path to the long-transient training maps
+}
+```
+
+Also verify that the training executable is:
+
+```python
+EXECUTABLE = SEARCH_ROOT / "build" / "sp_train"
+```
+
+From the directory containing the script, run:
+
+```bash
+python run_training.py
+```
+
+The script runs `sp_train` on every training map for each configured FoV. For each map, GCP determines the minimum search budget needed to reach the tile containing the true source and records the corresponding search-planning measurements.
+
+The four output files are stored in `results/training/`:
+
+```text
+results/training/
+├── short_2.5x2.5_tiling.csv
+├── short_5.36x4.5_tiling.csv
+├── longlow_2.5x2.5_tiling.csv
+└── longlow_5.36x4.5_tiling.csv
+```
+
+Detailed execution logs are stored in:
+
+```text
+results/training/logs/
+```
+
+The mapping statistics and GCP training outcomes have different roles:
+
+- `short_mapping_time_stats.csv` contains measurements used to predict map-generation time.
+- `short_5.36x4.5_tiling.csv` contains GCP outcomes used to estimate the probability of reaching the source within a given search budget.
+
+The corresponding files for the other scenario/FoV combinations serve the same purposes.
 
 
 ### 3.3 Phase B: Evaluate the Policies
@@ -565,27 +609,88 @@ Optionally, replace `nodeadline` with `gt` to generate ground-truth test maps fo
 
 #### Step 8: Run GCP and Simulate the Search
 
-For each generated test map:
+The `run_validation.py` script evaluates the generated test maps using the `sp_verify` executable.
 
-1. read its gathering and mapping times from the corresponding statistics CSV;
-2. subtract those times from the overall deadline;
-3. run GCP and measure its planning time;
-4. subtract the planning time from the remaining search budget;
-5. simulate following the planned path using the telescope slew, settling, and dwell-time models; and
-6. record whether the path reaches the true source tile before the deadline.
+Before running it, open the configuration section at the beginning of the script and check:
 
-```text
-TODO: Insert the exact GCP evaluation command after the sp_verify
-command-line interface has been finalized.
+```python
+SCENARIOS = ["short", "longlow"]
+POLICIES = ["utility", "nodeadline", "gt"]
+FOVS = ["2.5x2.5", "5.36x4.5"]
 ```
 
-Run this step for both transient scenarios, both FoVs, and every evaluated policy and deadline. Store the newly generated results under:
+Also verify the configured deadlines and test-map locations:
 
-```text
-results/recomputed_results/
+```python
+DEADLINES = {
+    "short": [10, 15, 20, 25, 30, 35, 40, 45, 50],
+    "longlow": [30, 40, 50, 60, 70, 80, 90, 100, 110],
+}
 ```
 
-Do not overwrite the distributed results under:
+```python
+UTILITY_ROOTS = {
+    # Paths to the FoV-specific utility-guided maps and statistics
+}
+
+BASELINE_ROOTS = {
+    # Paths to the FoV-independent nodeadline and gt maps and statistics
+}
+```
+
+The validation source-tile lookup files must be stored under:
+
+```text
+search-planning/tilings/source_tile_validation/
+├── source_tiles_2.5x2.5_short.csv
+├── source_tiles_5.36x4.5_short.csv
+├── source_tiles_2.5x2.5_longlow.csv
+└── source_tiles_5.36x4.5_longlow.csv
+```
+
+From the directory containing the script, run:
+
+```bash
+python run_validation.py
+```
+
+For each configured test map, the script and `sp_verify` perform the following steps:
+
+1. Read the gathering and map-generation times from the corresponding mapping-statistics CSV.
+2. Subtract the gathering and map-generation times from the overall deadline.
+3. Run GCP and measure the search-planning time.
+4. Subtract the planning time from the remaining search budget.
+5. Simulate following the resulting path using the telescope slew, settling, and dwell-time models.
+6. Record whether the path reaches the true source tile before the deadline.
+
+The script evaluates both transient scenarios, both FoVs, and every configured policy and deadline. Results are stored under:
+
+```text
+results/validation/
+```
+
+Each result filename has the following form:
+
+```text
+<scenario>_<fov>_tiling_<policy>_<deadline>.csv
+```
+
+For example:
+
+```text
+short_2.5x2.5_tiling_utility_10.csv
+short_5.36x4.5_tiling_nodeadline_30.csv
+longlow_2.5x2.5_tiling_gt_60.csv
+longlow_5.36x4.5_tiling_utility_110.csv
+```
+
+Detailed execution logs are stored in:
+
+```text
+results/validation/logs/
+```
+
+These newly generated results do not overwrite the distributed results under:
 
 ```text
 results/precomputed_results/

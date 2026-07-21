@@ -292,4 +292,22 @@ int main_verify(int argc, char** argv) {
     return 0;
 }
 
+#if defined(BUILD_SP_TRAIN)
+
+int main(int argc, char** argv) {
+    return main_train(argc, argv);
+}
+
+#elif defined(BUILD_SP_VERIFY)
+
+int main(int argc, char** argv) {
+    return main_verify(argc, argv);
+}
+
+#else
+
+#error "Either BUILD_SP_TRAIN or BUILD_SP_VERIFY must be defined."
+
+#endif
+
 
