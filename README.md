@@ -69,9 +69,7 @@ The artifact experiments consist of offline training followed by evaluation.
 
 2. **Run search planning.** For each training map and telescope FoV, run GCP with different search budgets. Record the planning time and the minimum modeled slew-and-dwell time required to reach a tile containing the true source.
 
-3. **Build the utility tables.** Use these measurements to estimate mapping time, planning time, and detection probability as functions of the observed event counts and remaining deadline. The paper uses `20 x 20` source/background bins and confidence level `q = 0.95`.
-
-The training process uses ground-truth information because the transient locations and lengths are known in the simulation.
+The utility query engine will use these measurements to estimate mapping time, planning time, and detection probability as functions of the observed event counts and remaining deadline. The paper uses `20 x 20` source/background bins and confidence level `q = 0.95`.
 
 #### Phase B: Evaluation
 
@@ -303,30 +301,15 @@ ls build/sp_train build/sp_verify
 
 You can visualize the results via Jupyter notebook.
 
-### 2.2 Run Jupyter notebook 
-
 ```bash
 conda activate cosipy-312
-cd ~/GRB-Search-Pipeline/results
-jupyter notebook visualize_results.ipynb
+cd ~/GRB-Search-Pipeline/precomputed_results
+jupyter notebook visualize_Results.ipynb
 ```
 
-### 2.3 Reproducing Results and Figures in the Jupyter Notebook
+The visualization should read from `precomputed_results/` and save newly generated figures to `precomputed_results/figures/`.
 
-The visualization should read from `results/precomputed_results/` and save newly generated figures to `results/figures/` or another clearly documented output directory.
-
-It should reproduce:
-
-- **Figure 4:** mapping runtime across the cosipy, JIT, external-memory, in-memory, and in-memory multiresolution implementations
-- **Figure 5:** map-generation time distributions and their dependence on source-event count
-- **Figure 6:** search-planning time distributions by transient scenario and FoV, and their dependence on source-event count
-- **Figure 7:** cumulative distribution of mapping error for short and long transients
-- **Figure 8:** mapping error as a function of source and background event counts
-- **Figure 9:** utility-selected gathering time relative to the deadline-oblivious baseline
-- **Figure 10:** change in mapping error caused by utility-selected gathering time
-- **Figure 11:** end-to-end success probability versus deadline for two transient scenarios and two FoVs
-
-Figures 1-3 are explanatory diagrams rather than outputs of the main experimental pipeline.
+It should reproduce all **Figure 5 - FIgure 11** presented in the **Result** section including .
 
 
 ## 3 Running Full Experiments
@@ -376,13 +359,6 @@ export LOG_ROOT="${OUTPUT_ROOT}/logs"
 mkdir -p "${TRAINING_STATS_ROOT}" "${LOG_ROOT}"
 ```
 
-Here:
-
-- `RESPONSE_MODEL` must point to `adapt_response_with_area.h5`.
-- `BACKGROUND_MODEL` must point to `adapt_bkg_model.h5`.
-- `SHORT_TRAINING_TRANSIENTS` and `LONG_TRAINING_TRANSIENTS` must point to the corresponding directories of simulated training transients.
-- The map output directories are created automatically by `map_adapt_transients.py` if they do not already exist.
-
 #### Step 2: Generate the Short-Transient Training Maps
 
 Run:
@@ -409,12 +385,6 @@ The options specify:
 - `-m`: write the generated maps to disk; and
 - `-o`: select the map output directory.
 
-No `-s` option is supplied during training, so the script processes every transient in the training directory.
-
-The script writes one row of statistics for each processed transient to standard output. Redirecting standard output creates `short_mapping_time_stats.csv`, which contains information including the source-event count, background-event count, gathering time, and measured map-generation time.
-
-The `gt` endpoint uses known source information only because this is an offline simulation for constructing the training data.
-
 #### Step 3: Generate the Long-Transient Training Maps
 
 Run the same command using the long-transient training directory:
@@ -432,8 +402,6 @@ python "${MAP_SCRIPT}" \
     > "${TRAINING_STATS_ROOT}/long_mapping_time_stats.csv" \
     2> "${LOG_ROOT}/long_training_maps.log"
 ```
-
-The likelihood maps are independent of the optical telescope FoV. Therefore, each training map needs to be generated only once, even though search planning is evaluated with multiple FoVs.
 
 #### Step 4: Run GCP on the Training Maps
 
@@ -493,12 +461,6 @@ results/training/
 └── longlow_5.36x4.5_tiling.csv
 ```
 
-Detailed execution logs are stored in:
-
-```text
-results/training/logs/
-```
-
 The mapping statistics and GCP training outcomes have different roles:
 
 - `short_mapping_time_stats.csv` contains measurements used to predict map-generation time.
@@ -513,99 +475,13 @@ The evaluation uses 10,000 test transients for each transient scenario. The scri
 
 #### Step 5: Configure the Evaluation Inputs
 
-Set the test directory and select the training files for the transient scenario and FoV being evaluated:
-
-```bash
-export TEST_TRANSIENTS="/path/to/test/transients"                 # TODO
-export TRAINING_TIMES_FILE="/path/to/mapping_time_stats.csv"      # TODO
-export TRAINING_OUTCOMES_FILE="/path/to/search_outcomes.csv"      # TODO
-
-export TEST_MAP_ROOT="${OUTPUT_ROOT}/test/maps"
-export TEST_STATS_ROOT="${OUTPUT_ROOT}/test/mapping_stats"
-
-mkdir -p "${TEST_STATS_ROOT}"
-```
-
-Here:
-
-- `TRAINING_TIMES_FILE` is the mapping-statistics file generated during Phase A, such as `short_mapping_time_stats.csv`.
-- `TRAINING_OUTCOMES_FILE` is the output of the GCP training experiments for the selected scenario and FoV, such as `short_5.36x4.5_tiling.csv`.
-
-If the distributed training data are used, these variables should instead point to the corresponding files in:
-
-```text
-/shared/training/emsoft_data/
-```
 
 #### Step 6: Generate Utility-Guided Test Maps
 
-Set the deadline, map output directory, and statistics output file:
 
-```bash
-export DEADLINE=10
-export TEST_MAP_DIR="${TEST_MAP_ROOT}/short/5.36x4.5/${DEADLINE}"
-export TEST_STATS_FILE="${TEST_STATS_ROOT}/short_5.36x4.5_${DEADLINE}.csv"
-```
-
-Generate the test maps:
-
-```bash
-python "${MAP_SCRIPT}" \
-    --response "${RESPONSE_MODEL}" \
-    --bkg-model "${BACKGROUND_MODEL}" \
-    -t 8 \
-    -n 64 \
-    -s 10000 \
-    --training-times "${TRAINING_TIMES_FILE}" \
-    --training-outcomes "${TRAINING_OUTCOMES_FILE}" \
-    "${TEST_TRANSIENTS}" \
-    "${DEADLINE}" \
-    -m \
-    -o "${TEST_MAP_DIR}" \
-    > "${TEST_STATS_FILE}" \
-    2> "${LOG_ROOT}/test_${DEADLINE}.log"
-```
-
-For the utility-guided policy, `DEADLINE` is the overall deadline in seconds. Repeat the command for every deadline and FoV evaluated in the paper.
-
-The short-transient deadlines are:
-
-```text
-10, 15, 20, 25, 30, 35, 40, 45, and 50 seconds
-```
-
-The long-transient deadlines are:
-
-```text
-30, 40, 50, 60, 70, 80, 90, 100, and 110 seconds
-```
-
-The training-outcomes file is FoV-specific. Therefore, utility-guided maps must be generated separately for each FoV.
-
-As in training, the script writes the test statistics to standard output. These statistics must be saved because they include the selected gathering time and measured map-generation time for each test transient.
 
 #### Step 7: Generate Deadline-Oblivious Test Maps
 
-Use `nodeadline` instead of an integer deadline to generate the deadline-oblivious baseline:
-
-```bash
-python "${MAP_SCRIPT}" \
-    --response "${RESPONSE_MODEL}" \
-    --bkg-model "${BACKGROUND_MODEL}" \
-    -t 8 \
-    -n 64 \
-    -s 10000 \
-    "${TEST_TRANSIENTS}" \
-    nodeadline \
-    -m \
-    -o "${TEST_MAP_ROOT}/short/nodeadline" \
-    > "${TEST_STATS_ROOT}/short_nodeadline.csv" \
-    2> "${LOG_ROOT}/short_nodeadline.log"
-```
-
-The deadline-oblivious policy does not use the utility training files. Its maps are also independent of the telescope FoV and therefore need to be generated only once per transient scenario.
-
-Optionally, replace `nodeadline` with `gt` to generate ground-truth test maps for reference.
 
 #### Step 8: Run GCP and Simulate the Search
 
@@ -654,14 +530,6 @@ From the directory containing the script, run:
 python run_validation.py
 ```
 
-For each configured test map, the script and `sp_verify` perform the following steps:
-
-1. Read the gathering and map-generation times from the corresponding mapping-statistics CSV.
-2. Subtract the gathering and map-generation times from the overall deadline.
-3. Run GCP and measure the search-planning time.
-4. Subtract the planning time from the remaining search budget.
-5. Simulate following the resulting path using the telescope slew, settling, and dwell-time models.
-6. Record whether the path reaches the true source tile before the deadline.
 
 The script evaluates both transient scenarios, both FoVs, and every configured policy and deadline. Results are stored under:
 
@@ -682,16 +550,4 @@ short_2.5x2.5_tiling_utility_10.csv
 short_5.36x4.5_tiling_nodeadline_30.csv
 longlow_2.5x2.5_tiling_gt_60.csv
 longlow_5.36x4.5_tiling_utility_110.csv
-```
-
-Detailed execution logs are stored in:
-
-```text
-results/validation/logs/
-```
-
-These newly generated results do not overwrite the distributed results under:
-
-```text
-results/precomputed_results/
 ```
