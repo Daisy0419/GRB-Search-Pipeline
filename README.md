@@ -135,7 +135,8 @@ The artifact uses the source repository and downloaded transient-data directory 
     |-- emsoft_training_short/
     |-- emsoft_training_longlow/
     |-- emsoft_test_short/
-    `-- emsoft_test_longlow/
+    |-- emsoft_test_longlow/
+    `-- dc3_benchmark_data/
 ```
 
 The large transient datasets under `~/transients/` are downloaded separately and are not stored in the Git repository. Newly generated files are written under `~/GRB-Search-Pipeline/results/`, while the distributed files under `~/GRB-Search-Pipeline/precomputed_results/` should remain unchanged.
@@ -370,23 +371,23 @@ ls build/sp_train build/sp_verify
 
 ### 1.2 Download the Experiment Data
 
-The detector models and simulated transient datasets are distributed separately from the source-code repository because the complete extracted dataset is approximately 25-30 GB.
+The detector models and simulated transient datasets are distributed separately from the source-code repository because of their size. The compressed archive is approximately 16.2 GB; allow approximately 25–30 GB of storage after extraction.
 
 The data archive is available from Zenodo:
 
-- **Zenodo record:** [TODO: Zenodo record](TODO_ZENODO_RECORD_URL)
+- **Zenodo record:** [https://zenodo.org/records/21497891](https://zenodo.org/records/21497891)
 - **Archive:** `transients.tar.gz`
-- **Download size:** TODO
-- **SHA-256:** `TODO_SHA256`
+- **Download size:** 16.2 GB
+- **MD5:** `ba6f9511b99b5fb3faaebfaae01e03ac`
 
-The archive contains the complete `transients/` directory and should be extracted directly under the home directory.
+The archive contains the complete `transients/` directory and should be extracted directly under the user's home directory.
 
 #### 1.2.1 Download the Archive
 
 Download the archive using a browser from the Zenodo record above, or run:
 
 ```bash
-export TRANSIENTS_URL="TODO_TRANSIENTS_ARCHIVE_URL"
+export TRANSIENTS_URL="https://zenodo.org/records/21497891/files/transients.tar.gz?download=1"
 export TRANSIENTS_ARCHIVE="${HOME}/transients.tar.gz"
 
 curl \
@@ -403,18 +404,19 @@ Alternatively, use `wget`:
 
 ```bash
 wget -c \
-    "TODO_TRANSIENTS_ARCHIVE_URL" \
+    "https://zenodo.org/records/21497891/files/transients.tar.gz?download=1" \
     -O "${HOME}/transients.tar.gz"
 ```
 
 #### 1.2.2 Verify the Download
 
-Verify the archive checksum before extracting it:
+Zenodo publishes the MD5 checksum for the archive. Verify it before extracting:
 
 ```bash
 cd "${HOME}"
 
-echo "TODO_SHA256  transients.tar.gz" | sha256sum --check
+echo "ba6f9511b99b5fb3faaebfaae01e03ac  transients.tar.gz" \
+    | md5sum --check
 ```
 
 The expected output is:
@@ -443,7 +445,21 @@ This should create:
 ├── emsoft_training_short/
 ├── emsoft_training_longlow/
 ├── emsoft_test_short/
-└── emsoft_test_longlow/
+├── emsoft_test_longlow/
+└── dc3_benchmark_data/
+```
+
+Verify the extracted directories:
+
+```bash
+ls "${HOME}/transients"
+ls "${HOME}/transients/models"
+```
+
+After successful extraction and verification, the downloaded archive may be removed to recover disk space:
+
+```bash
+rm "${HOME}/transients.tar.gz"
 ```
 
 --- 
