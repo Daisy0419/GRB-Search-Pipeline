@@ -126,7 +126,7 @@ The artifact uses the source repository and downloaded transient-data directory 
 |   |   |-- run_training.py          # Runs GCP on training maps
 |   |   `-- run_validation.py        # Evaluates generated test maps
 |   |-- results/                     # Newly generated outputs and figures
-|   |-- precomputed_results/         # Distributed training tables and paper results
+|   |-- precomputed_results/         # Distributed results and visualization notebook
 |   |-- cosipy-312-deps.yaml         # Python environment configuration
 |   `-- README.md                    # Artifact instructions
 `-- transients/                      # Downloaded models and transient datasets
@@ -328,6 +328,15 @@ This produces two binaries in `build/`. Both are compiled from `src/main.cpp` an
 - **`sp_train`** — compiled with `BUILD_SP_TRAIN` and dispatches to `main_train()`. It processes training maps and produces search-outcome training data.
 - **`sp_verify`** — compiled with `BUILD_SP_VERIFY` and dispatches to `main_verify()`. It processes evaluation maps and records whether the simulated search reaches the source before the deadline.
 
+The Python drivers pass the destination CSV as the final command-line argument. The executable interfaces are:
+
+```text
+sp_train <map> <tiling> <source_tile> <w_max> <w_acc> <dwell_time> <is_deepslow> <output_csv>
+sp_verify <map> <tiling> <source_tile> <w_max> <w_acc> <remaining_budget> <is_deepslow> <output_csv>
+```
+
+Each invocation appends one result row directly to `<output_csv>`. The Python driver creates the parent result directory and selects the final filename.
+
 Verify that both binaries were created:
 
 ```bash
@@ -421,11 +430,14 @@ You can visualize the results via Jupyter notebook.
 
 ```bash
 conda activate cosipy-312
-cd ~/GRB-Search-Pipeline/results
-jupyter notebook visualize_results.ipynb
+cd ~/GRB-Search-Pipeline/precomputed_results
+
+GRB_RESULTS_ROOT="${HOME}/GRB-Search-Pipeline/precomputed_results" \
+GRB_FIGURE_OUTPUT_DIR="${HOME}/GRB-Search-Pipeline/results/figures" \
+jupyter notebook visualize_Results.ipynb
 ```
 
-The visualization notebook should read the distributed results from `~/GRB-Search-Pipeline/precomputed_results/` and save newly generated figures under `~/GRB-Search-Pipeline/results/figures/`. Do not modify the distributed precomputed results.
+The environment variables above make the notebook read the distributed results from `~/GRB-Search-Pipeline/precomputed_results/` and save newly generated figures under `~/GRB-Search-Pipeline/results/figures/`. Do not modify the distributed precomputed results.
 
 The notebook should reproduce Figures 4-11 from the paper's results section. Figures 1-3 are explanatory diagrams rather than outputs of the experiment workflow.
 
@@ -437,9 +449,7 @@ The full experiment has two phases:
 1. **Training:** generate training maps, measure mapping and planning times, and collect the data used by the utility estimator.
 2. **Evaluation:** generate maps for 10,000 test transients, run search planning, simulate the optical search, and calculate the success probability.
 
-The full experiment is computationally expensive. To reproduce only the paper figures using the distributed results, skip this section and follow [Section 2](#2-reproducing-paper-figures).
-
-To rerun evaluation using the distributed training tables, complete Step 1 to configure the common paths, skip Steps 2-4, and select the precomputed-training-data option in Step 5.
+The full experiment is computationally expensive. To reproduce only the paper figures using the distributed results, skip this section and follow [Section 2](#2-reproducing-paper-figures). The full experiment workflow below runs both Phase A and Phase B.
 
 
 ### 3.1 Phase A: Generate the Offline Training Data
@@ -603,22 +613,22 @@ From the directory containing `run_training.py`, run:
 python run_training.py
 ```
 
-The script invokes `sp_train` on every training map for each configured FoV. For each map, GCP records the planning runtime and the minimum search budget needed to reach the tile containing the true source.
+The script invokes `sp_train` on every training map for each configured FoV. For each map, GCP records the planning runtime and the minimum search budget needed to reach the tile containing the true source. The script passes the corresponding final training CSV path directly to `sp_train`.
 
 The four output files are:
 
 ```text
 ~/GRB-Search-Pipeline/results/training/
-├── short_2.5x2.5_tiling.csv
-├── short_5.36x4.5_tiling.csv
-├── longlow_2.5x2.5_tiling.csv
-└── longlow_5.36x4.5_tiling.csv
+├── short_searching_2.5x2.5_tiling.csv
+├── short_searching_5.36x4.5_tiling.csv
+├── longlow_searching_2.5x2.5_tiling.csv
+└── longlow_searching_5.36x4.5_tiling.csv
 ```
 
 The mapping statistics and GCP outcomes have different roles:
 
 - `short_mapping_time_stats.csv` contains measurements used to predict map-generation time.
-- `short_5.36x4.5_tiling.csv` contains outcomes used to estimate the probability of reaching the source within a given search budget.
+- `short_searching_5.36x4.5_tiling.csv` contains outcomes used to estimate the probability of reaching the source within a given search budget.
 
 The corresponding longlow and `2.5x2.5` files serve the same purposes.
 
@@ -632,14 +642,17 @@ Configure the evaluation output directories:
 
 ```bash
 export VALIDATION_ROOT="${REPO_ROOT}/results/validation"
-export GENERATED_TEST_ROOT="${VALIDATION_ROOT}/generated"
+export VALIDATION_MAP_ROOT="${VALIDATION_ROOT}/maps"
+export VALIDATION_STATS_ROOT="${VALIDATION_ROOT}/mapping_stats"
+export VALIDATION_LOG_ROOT="${VALIDATION_ROOT}/logs"
 
-mkdir -p "${GENERATED_TEST_ROOT}"
+mkdir -p \
+    "${VALIDATION_MAP_ROOT}" \
+    "${VALIDATION_STATS_ROOT}" \
+    "${VALIDATION_LOG_ROOT}"
 ```
 
-Choose one of the following training-data sources.
-
-To use the training data generated in Phase A:
+Use the training data generated in Phase A:
 
 ```bash
 export SHORT_MAPPING_TIMES="${TRAINING_ROOT}/short_mapping_time_stats.csv"
@@ -647,29 +660,19 @@ export LONGLOW_MAPPING_TIMES="${TRAINING_ROOT}/longlow_mapping_time_stats.csv"
 export TRAINING_OUTCOMES_ROOT="${TRAINING_ROOT}"
 ```
 
-To skip Phase A and use the distributed training data:
-
-```bash
-export PRECOMPUTED_TRAINING_ROOT="${REPO_ROOT}/precomputed_results/training"
-
-export SHORT_MAPPING_TIMES="${PRECOMPUTED_TRAINING_ROOT}/short-stats.csv"
-export LONGLOW_MAPPING_TIMES="${PRECOMPUTED_TRAINING_ROOT}/TODO_LONGLOW_MAPPING_TIME_STATS.csv"
-export TRAINING_OUTCOMES_ROOT="${PRECOMPUTED_TRAINING_ROOT}"
-```
-
-Replace `TODO_LONGLOW_MAPPING_TIME_STATS.csv` with the distributed longlow mapping-time filename after that filename has been finalized.
-
 Verify the selected files before continuing:
 
 ```bash
 ls "${SHORT_MAPPING_TIMES}"
 ls "${LONGLOW_MAPPING_TIMES}"
 
-ls "${TRAINING_OUTCOMES_ROOT}/short_2.5x2.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/short_5.36x4.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/longlow_2.5x2.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/longlow_5.36x4.5_tiling.csv"
+ls "${TRAINING_OUTCOMES_ROOT}/short_searching_2.5x2.5_tiling.csv"
+ls "${TRAINING_OUTCOMES_ROOT}/short_searching_5.36x4.5_tiling.csv"
+ls "${TRAINING_OUTCOMES_ROOT}/longlow_searching_2.5x2.5_tiling.csv"
+ls "${TRAINING_OUTCOMES_ROOT}/longlow_searching_5.36x4.5_tiling.csv"
 ```
+
+The validation output uses the same scenario/FoV directory names as `precomputed_results/validation/`, allowing the same visualization notebook to read either result tree.
 
 #### Step 6: Generate Utility-Guided Test Maps
 
@@ -680,8 +683,15 @@ For short transients, run:
 ```bash
 for FOV in 2.5x2.5 5.36x4.5; do
     for DEADLINE in 10 15 20 25 30 35 40 45 50; do
-        EXPERIMENT_ROOT="${GENERATED_TEST_ROOT}/short/${FOV}"
-        mkdir -p "${EXPERIMENT_ROOT}"
+        CASE_NAME="${FOV}_short"
+        MAP_CASE_ROOT="${VALIDATION_MAP_ROOT}/${CASE_NAME}"
+        STATS_CASE_ROOT="${VALIDATION_STATS_ROOT}/${CASE_NAME}"
+        LOG_CASE_ROOT="${VALIDATION_LOG_ROOT}/${CASE_NAME}"
+
+        mkdir -p \
+            "${MAP_CASE_ROOT}" \
+            "${STATS_CASE_ROOT}" \
+            "${LOG_CASE_ROOT}"
 
         echo "Running short: FoV=${FOV}, deadline=${DEADLINE}"
 
@@ -695,13 +705,13 @@ for FOV in 2.5x2.5 5.36x4.5; do
             -r 1957 \
             --training-times "${SHORT_MAPPING_TIMES}" \
             --training-outcomes \
-                "${TRAINING_OUTCOMES_ROOT}/short_${FOV}_tiling.csv" \
+                "${TRAINING_OUTCOMES_ROOT}/short_searching_${FOV}_tiling.csv" \
             "${SHORT_TEST_TRANSIENTS}" \
             "${DEADLINE}" \
             -m \
-            -o "${EXPERIMENT_ROOT}/emsoft_maps_${DEADLINE}" \
-            > "${EXPERIMENT_ROOT}/emsoft_stats_${DEADLINE}.csv" \
-            2> "${EXPERIMENT_ROOT}/emsoft_maps_${DEADLINE}.log"
+            -o "${MAP_CASE_ROOT}/emsoft_maps_${DEADLINE}" \
+            > "${STATS_CASE_ROOT}/emsoft_stats_${DEADLINE}.csv" \
+            2> "${LOG_CASE_ROOT}/emsoft_maps_${DEADLINE}.log"
     done
 done
 ```
@@ -711,8 +721,15 @@ For longlow transients, run:
 ```bash
 for FOV in 2.5x2.5 5.36x4.5; do
     for DEADLINE in 30 40 50 60 70 80 90 100 110; do
-        EXPERIMENT_ROOT="${GENERATED_TEST_ROOT}/longlow/${FOV}"
-        mkdir -p "${EXPERIMENT_ROOT}"
+        CASE_NAME="${FOV}_longlow"
+        MAP_CASE_ROOT="${VALIDATION_MAP_ROOT}/${CASE_NAME}"
+        STATS_CASE_ROOT="${VALIDATION_STATS_ROOT}/${CASE_NAME}"
+        LOG_CASE_ROOT="${VALIDATION_LOG_ROOT}/${CASE_NAME}"
+
+        mkdir -p \
+            "${MAP_CASE_ROOT}" \
+            "${STATS_CASE_ROOT}" \
+            "${LOG_CASE_ROOT}"
 
         echo "Running longlow: FoV=${FOV}, deadline=${DEADLINE}"
 
@@ -726,13 +743,13 @@ for FOV in 2.5x2.5 5.36x4.5; do
             -r 1957 \
             --training-times "${LONGLOW_MAPPING_TIMES}" \
             --training-outcomes \
-                "${TRAINING_OUTCOMES_ROOT}/longlow_${FOV}_tiling.csv" \
+                "${TRAINING_OUTCOMES_ROOT}/longlow_searching_${FOV}_tiling.csv" \
             "${LONGLOW_TEST_TRANSIENTS}" \
             "${DEADLINE}" \
             -m \
-            -o "${EXPERIMENT_ROOT}/emsoft_maps_${DEADLINE}" \
-            > "${EXPERIMENT_ROOT}/emsoft_stats_${DEADLINE}.csv" \
-            2> "${EXPERIMENT_ROOT}/emsoft_maps_${DEADLINE}.log"
+            -o "${MAP_CASE_ROOT}/emsoft_maps_${DEADLINE}" \
+            > "${STATS_CASE_ROOT}/emsoft_stats_${DEADLINE}.csv" \
+            2> "${LOG_CASE_ROOT}/emsoft_maps_${DEADLINE}.log"
     done
 done
 ```
@@ -746,8 +763,15 @@ The `nodeadline` and `gt` endpoint modes do not use the utility training tables 
 For short transients, run:
 
 ```bash
-BASELINE_ROOT="${GENERATED_TEST_ROOT}/short/baselines"
-mkdir -p "${BASELINE_ROOT}"
+CASE_NAME="no-fov_short"
+MAP_CASE_ROOT="${VALIDATION_MAP_ROOT}/${CASE_NAME}"
+STATS_CASE_ROOT="${VALIDATION_STATS_ROOT}/${CASE_NAME}"
+LOG_CASE_ROOT="${VALIDATION_LOG_ROOT}/${CASE_NAME}"
+
+mkdir -p \
+    "${MAP_CASE_ROOT}" \
+    "${STATS_CASE_ROOT}" \
+    "${LOG_CASE_ROOT}"
 
 for MODE in nodeadline gt; do
     env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
@@ -761,17 +785,24 @@ for MODE in nodeadline gt; do
         "${SHORT_TEST_TRANSIENTS}" \
         "${MODE}" \
         -m \
-        -o "${BASELINE_ROOT}/emsoft_maps_${MODE}" \
-        > "${BASELINE_ROOT}/emsoft_stats_${MODE}.csv" \
-        2> "${BASELINE_ROOT}/emsoft_maps_${MODE}.log"
+        -o "${MAP_CASE_ROOT}/emsoft_maps_${MODE}" \
+        > "${STATS_CASE_ROOT}/emsoft_stats_${MODE}.csv" \
+        2> "${LOG_CASE_ROOT}/emsoft_maps_${MODE}.log"
 done
 ```
 
 For longlow transients, run:
 
 ```bash
-BASELINE_ROOT="${GENERATED_TEST_ROOT}/longlow/baselines"
-mkdir -p "${BASELINE_ROOT}"
+CASE_NAME="no-fov_longlow"
+MAP_CASE_ROOT="${VALIDATION_MAP_ROOT}/${CASE_NAME}"
+STATS_CASE_ROOT="${VALIDATION_STATS_ROOT}/${CASE_NAME}"
+LOG_CASE_ROOT="${VALIDATION_LOG_ROOT}/${CASE_NAME}"
+
+mkdir -p \
+    "${MAP_CASE_ROOT}" \
+    "${STATS_CASE_ROOT}" \
+    "${LOG_CASE_ROOT}"
 
 for MODE in nodeadline gt; do
     env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
@@ -785,17 +816,31 @@ for MODE in nodeadline gt; do
         "${LONGLOW_TEST_TRANSIENTS}" \
         "${MODE}" \
         -m \
-        -o "${BASELINE_ROOT}/emsoft_maps_${MODE}" \
-        > "${BASELINE_ROOT}/emsoft_stats_${MODE}.csv" \
-        2> "${BASELINE_ROOT}/emsoft_maps_${MODE}.log"
+        -o "${MAP_CASE_ROOT}/emsoft_maps_${MODE}" \
+        > "${STATS_CASE_ROOT}/emsoft_stats_${MODE}.csv" \
+        2> "${LOG_CASE_ROOT}/emsoft_maps_${MODE}.log"
 done
 ```
 
 The `gt` mode uses the true transient duration and is included only as a ground-truth reference. It is not an implementable runtime policy.
 
+After Steps 6 and 7, the generated mapping statistics are organized as:
+
+```text
+results/validation/mapping_stats/
+├── 2.5x2.5_longlow/
+├── 2.5x2.5_short/
+├── 5.36x4.5_longlow/
+├── 5.36x4.5_short/
+├── no-fov_longlow/
+└── no-fov_short/
+```
+
+The `maps/` and `logs/` directories use the same six case names. This matches the case naming under `precomputed_results/validation/mapping_stats/`.
+
 #### Step 8: Run GCP and Simulate the Search
 
-The `run_validation.py` script evaluates the generated test maps using the `sp_verify` executable.
+The `run_validation.py` script evaluates the generated test maps using the `sp_verify` executable. It passes the appropriate FoV-specific result CSV path directly to each `sp_verify` invocation.
 
 The validation source-tile lookup files must be stored under:
 
@@ -819,46 +864,32 @@ DEADLINES = {
     "longlow": [30, 40, 50, 60, 70, 80, 90, 100, 110],
 }
 
-UTILITY_ROOTS = {
-    "short": str(
-        REPO_ROOT
-        / "results"
-        / "validation"
-        / "generated"
-        / "short"
-        / "{fov}"
-    ),
-    "longlow": str(
-        REPO_ROOT
-        / "results"
-        / "validation"
-        / "generated"
-        / "longlow"
-        / "{fov}"
-    ),
+VALIDATION_ROOT = REPO_ROOT / "results" / "validation"
+MAP_ROOT = VALIDATION_ROOT / "maps"
+MAPPING_STATS_ROOT = VALIDATION_ROOT / "mapping_stats"
+
+UTILITY_MAP_ROOTS = {
+    "short": str(MAP_ROOT / "{fov}_short"),
+    "longlow": str(MAP_ROOT / "{fov}_longlow"),
 }
 
-BASELINE_ROOTS = {
-    "short": (
-        REPO_ROOT
-        / "results"
-        / "validation"
-        / "generated"
-        / "short"
-        / "baselines"
-    ),
-    "longlow": (
-        REPO_ROOT
-        / "results"
-        / "validation"
-        / "generated"
-        / "longlow"
-        / "baselines"
-    ),
+UTILITY_STATS_ROOTS = {
+    "short": str(MAPPING_STATS_ROOT / "{fov}_short"),
+    "longlow": str(MAPPING_STATS_ROOT / "{fov}_longlow"),
+}
+
+BASELINE_MAP_ROOTS = {
+    "short": MAP_ROOT / "no-fov_short",
+    "longlow": MAP_ROOT / "no-fov_longlow",
+}
+
+BASELINE_STATS_ROOTS = {
+    "short": MAPPING_STATS_ROOT / "no-fov_short",
+    "longlow": MAPPING_STATS_ROOT / "no-fov_longlow",
 }
 
 EXECUTABLE = SEARCH_ROOT / "build" / "sp_verify"
-RESULTS_DIR = REPO_ROOT / "results" / "validation"
+SEARCH_RESULTS_ROOT = VALIDATION_ROOT
 ```
 
 Make the HDF5 library and Bitshuffle reader plugin available to the C++ executable:
@@ -887,10 +918,12 @@ For each test map, the script:
 5. simulates following the planned path using the telescope timing model; and
 6. records whether the path reaches the true source tile before the deadline.
 
-The result files are stored under:
+The result files are grouped by FoV under:
 
 ```text
 ~/GRB-Search-Pipeline/results/validation/
+├── searching_results_2.5x2.5/
+└── searching_results_5.36x4.5/
 ```
 
 Each result filename has the following form:
@@ -902,11 +935,35 @@ Each result filename has the following form:
 Examples include:
 
 ```text
-short_2.5x2.5_tiling_utility_10.csv
-short_5.36x4.5_tiling_nodeadline_30.csv
-longlow_2.5x2.5_tiling_gt_60.csv
-longlow_5.36x4.5_tiling_utility_110.csv
+searching_results_2.5x2.5/short_2.5x2.5_tiling_utility_10.csv
+searching_results_5.36x4.5/short_5.36x4.5_tiling_nodeadline_30.csv
+searching_results_2.5x2.5/longlow_2.5x2.5_tiling_gt_60.csv
+searching_results_5.36x4.5/longlow_5.36x4.5_tiling_utility_110.csv
 ```
 
-#### Step 9: Visualize the Recomputed Results
+#### Step 9: Aggregate and Visualize the Recomputed Results
 
+The recomputed `results/` directory follows the same training and validation layout as `precomputed_results/`. Therefore, use the same notebook and select the recomputed result root through `GRB_RESULTS_ROOT`:
+
+```bash
+conda activate cosipy-312
+cd "${REPO_ROOT}/precomputed_results"
+
+GRB_RESULTS_ROOT="${REPO_ROOT}/results" \
+GRB_FIGURE_OUTPUT_DIR="${REPO_ROOT}/results/figures" \
+jupyter notebook visualize_Results.ipynb
+```
+
+The notebook reads the recomputed training and validation CSV files under:
+
+```text
+~/GRB-Search-Pipeline/results/
+```
+
+and writes the generated figures under:
+
+```text
+~/GRB-Search-Pipeline/results/figures/
+```
+
+Do not overwrite files under `~/GRB-Search-Pipeline/precomputed_results/`.

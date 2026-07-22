@@ -193,12 +193,8 @@ void verify_maps (std::string tilefile, std::string mapfile, std::string out_fil
 int main_train(int argc, char** argv) {
     auto total_start = std::chrono::high_resolution_clock::now();
     get_timer().start();
-    // default parameters
-    std::string out_file = "../results4/out.csv";
-    // std::string tilefile = "../data/tilings/5.36x4.5_tiling.csv";
+    std::string out_file = "out.csv";
     std::string tilefile = "../data/tilings/2.5x2.5_tiling.csv";
-    // std::string mapfile = "../data/ADAPT_maps_new/test/adapt_p0_a0_51_map.h5";
-    // std::string mapfile = "/shared/training/longlow_maps/adapt_p60-00000000000001_a337-49999999999994_1_map.h5";
     std::string mapfile = "/shared/training/longlow_maps/adapt_p60-00000000000001_a337-49999999999994_357_map.h5";
     std::string runtime_file = "../results/time.csv";
 
@@ -209,7 +205,6 @@ int main_train(int argc, char** argv) {
     double dwell_time = 1;
     double settle_time = 0.0;
     bool is_deepslow = false;
-    double budget = 0.0;
 
     if (argc > 2) {
         mapfile = std::string(argv[1]);
@@ -219,15 +214,19 @@ int main_train(int argc, char** argv) {
         source_tile = std::stoi(argv[3]);
         w_max = std::stod(argv[4]);
         w_acc = std::stod(argv[5]);
-        budget = std::stod(argv[6]);
+        dwell_time = std::stod(argv[6]);
         is_deepslow = std::stoi(argv[7]);
+    }
+    if (argc > 8) {
+        out_file = std::string(argv[8]);
     }
 
     std::cout << "Input Parameters:\n";
     std::cout << "  file        = " << mapfile << "\n";
     std::cout << "  source_tile = " << source_tile << "\n";
     std::cout << "  slew_rate   = " << w_max << "\n";
-    std::cout << "  dwell_time  = " << dwell_time << "\n\n";
+    std::cout << "  dwell_time  = " << dwell_time << "\n";
+    std::cout << "  output      = " << out_file << "\n\n";
 
     find_source(tilefile, mapfile, out_file,
                 dwell_time, w_max, w_acc, settle_time,
@@ -245,16 +244,11 @@ int main_verify(int argc, char** argv) {
     auto total_start = std::chrono::high_resolution_clock::now();
     get_timer().start();
     // default parameters
-    std::string out_file = "../results4/out.csv";
-    // std::string tilefile = "../data/tilings/5.36x4.5_tiling.csv";
+    std::string out_file = "out.csv";
     std::string tilefile = "../data/tilings/2.5x2.5_tiling.csv";
-    // std::string mapfile = "../data/ADAPT_maps_new/test/adapt_p0_a0_51_map.h5";
-    // std::string mapfile = "/shared/training/longlow_maps/adapt_p60-00000000000001_a337-49999999999994_1_map.h5";
     std::string mapfile = "/shared/training/longlow_maps/adapt_p60-00000000000001_a337-49999999999994_357_map.h5";
-    std::string runtime_file = "../results/time.csv";
 
     int source_tile = 1350;
-    // int source_tile = 1613;
     double w_max = 10;
     double w_acc = 10;
     double dwell_time = 1;
@@ -273,13 +267,17 @@ int main_verify(int argc, char** argv) {
         budget = std::stod(argv[6]);
         is_deepslow = std::stoi(argv[7]);
     }
+    if (argc > 8) {
+        out_file = std::string(argv[8]);
+    }
 
     std::cout << "Input Parameters:\n";
     std::cout << "  file        = " << mapfile << "\n";
     std::cout << "  source_tile = " << source_tile << "\n";
     std::cout << "  slew_rate   = " << w_max << "\n";
-    std::cout << "  dwell_time  = " << dwell_time << "\n\n";
-
+    std::cout << "  budget      = " << budget << "\n";
+    std::cout << "  dwell_time  = " << dwell_time << "\n";
+    std::cout << "  output      = " << out_file << "\n\n";
 
     verify_maps (tilefile, mapfile, out_file, budget, dwell_time, 
                     w_max, w_acc, settle_time,
@@ -291,6 +289,7 @@ int main_verify(int argc, char** argv) {
     std::cout << "total time (wallclock): " << elapsed_seconds.count() << " seconds" << std::endl;
     return 0;
 }
+
 
 #if defined(BUILD_SP_TRAIN)
 
@@ -309,5 +308,4 @@ int main(int argc, char** argv) {
 #error "Either BUILD_SP_TRAIN or BUILD_SP_VERIFY must be defined."
 
 #endif
-
 

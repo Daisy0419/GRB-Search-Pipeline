@@ -6,20 +6,20 @@ from __future__ import annotations
 import csv
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 
-
+# =============================================================================
 # Configuration -- edit only this section
+# =============================================================================
 
 REPO_ROOT = Path.home() / "GRB-Search-Pipeline"
 SEARCH_ROOT = REPO_ROOT / "search-planning"
 
-# scenarios, policies, and FoVs 
+# Only the listed scenarios, policies, and FoVs are processed.
 SCENARIOS = ["short", "longlow"]
 POLICIES = ["utility", "nodeadline"]
 FOVS = ["2.5x2.5", "5.36x4.5"]
@@ -29,31 +29,39 @@ DEADLINES = {
     "longlow": [30, 40, 50, 60, 70, 80, 90, 100, 110],
 }
 
-# Utility-guided maps are FoV-specific. The {fov} field is replaced by the
-# current entry in FOVS.
-UTILITY_ROOTS = {
-    "short": "/shared/valid_tests/{fov}",
-    "longlow": "/shared/valid_tests/{fov}_longlow",
+VALIDATION_ROOT = REPO_ROOT / "results" / "validation"
+MAP_ROOT = VALIDATION_ROOT / "maps"
+MAPPING_STATS_ROOT = VALIDATION_ROOT / "mapping_stats"
+
+# Utility-guided maps and statistics are FoV-specific. The {fov} field is
+# replaced by the current entry in FOVS.
+UTILITY_MAP_ROOTS = {
+    "short": str(MAP_ROOT / "{fov}_short"),
+    "longlow": str(MAP_ROOT / "{fov}_longlow"),
+}
+UTILITY_STATS_ROOTS = {
+    "short": str(MAPPING_STATS_ROOT / "{fov}_short"),
+    "longlow": str(MAPPING_STATS_ROOT / "{fov}_longlow"),
 }
 
 # The nodeadline and gt maps are independent of FoV and reused for both FoVs.
-BASELINE_ROOTS = {
-    "short": Path("/shared/valid_tests/no-fov"),
-    "longlow": Path("/shared/valid_tests/no-fov_longlow"),
+BASELINE_MAP_ROOTS = {
+    "short": MAP_ROOT / "no-fov_short",
+    "longlow": MAP_ROOT / "no-fov_longlow",
+}
+BASELINE_STATS_ROOTS = {
+    "short": MAPPING_STATS_ROOT / "no-fov_short",
+    "longlow": MAPPING_STATS_ROOT / "no-fov_longlow",
 }
 
 EXECUTABLE = SEARCH_ROOT / "build" / "sp_verify"
 TILING_DIR = SEARCH_ROOT / "tilings" / "tiling_files"
 SOURCE_TILE_DIR = SEARCH_ROOT / "tilings" / "source_tile_validation"
-RESULTS_DIR = REPO_ROOT / "results" / "validation"
+SEARCH_RESULTS_ROOT = VALIDATION_ROOT
 
 W_MAX = 10.0
 W_ACC = 10.0
 IS_DEEPSLOW = False
-
-# sp_verify must append its output rows to this filename in its working
-# directory. The script moves the completed file to its final name.
-RAW_RESULT_NAME = "out.csv"
 
 # Set to an integer for a short test, for example MAX_MAPS = 5.
 MAX_MAPS: int | None = None
@@ -231,27 +239,29 @@ def experiment_paths(
     deadline: int,
 ) -> tuple[Path, Path]:
     if policy == "utility":
-        root = Path(UTILITY_ROOTS[scenario].format(fov=fov))
+        map_root = Path(UTILITY_MAP_ROOTS[scenario].format(fov=fov))
+        stats_root = Path(UTILITY_STATS_ROOTS[scenario].format(fov=fov))
         return (
-            root / f"emsoft_maps_{deadline}",
-            root / f"emsoft_stats_{deadline}.csv",
+            map_root / f"emsoft_maps_{deadline}",
+            stats_root / f"emsoft_stats_{deadline}.csv",
         )
 
-    root = BASELINE_ROOTS[scenario]
+    map_root = BASELINE_MAP_ROOTS[scenario]
+    stats_root = BASELINE_STATS_ROOTS[scenario]
     return (
-        root / f"emsoft_maps_{policy}",
-        root / f"emsoft_stats_{policy}.csv",
+        map_root / f"emsoft_maps_{policy}",
+        stats_root / f"emsoft_stats_{policy}.csv",
     )
 
 
-def prepare_output(raw_result: Path, final_result: Path) -> None:
-    for path in (raw_result, final_result):
-        if path.exists():
-            if not OVERWRITE:
-                raise FileExistsError(
-                    f"Output already exists: {path}. Set OVERWRITE = True to replace it."
-                )
-            path.unlink()
+def prepare_output(result_file: Path) -> None:
+    if result_file.exists():
+        if not OVERWRITE:
+            raise FileExistsError(
+                f"Output already exists: {result_file}. "
+                "Set OVERWRITE = True to replace it."
+            )
+        result_file.unlink()
 
 
 def run_sp_verify(
@@ -259,6 +269,8 @@ def run_sp_verify(
     tiling_file: Path,
     source_tile: int,
     remaining_time: float,
+    result_file: Path,
+    results_dir: Path,
     log_stream,
 ) -> None:
     command = [
@@ -270,13 +282,14 @@ def run_sp_verify(
         str(W_ACC),
         str(remaining_time),
         "1" if IS_DEEPSLOW else "0",
+        str(result_file),
     ]
 
     log_stream.write(f"\n$ {shlex.join(command)}\n")
     log_stream.flush()
     subprocess.run(
         command,
-        cwd=RESULTS_DIR,
+        cwd=results_dir,
         text=True,
         stdout=log_stream,
         stderr=subprocess.STDOUT,
@@ -303,11 +316,14 @@ def run_experiment(scenario: str, policy: str, fov: str, deadline: int) -> None:
         raise FileNotFoundError(f"No *_map.h5 files found in {map_dir}")
 
     timing_records = load_timing_records(stats_file, map_dir)
-    raw_result = RESULTS_DIR / RAW_RESULT_NAME
+    results_dir = SEARCH_RESULTS_ROOT / f"searching_results_{fov}"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    (results_dir / "logs").mkdir(parents=True, exist_ok=True)
+
     result_stem = f"{scenario}_{fov}_tiling_{policy}_{deadline}"
-    final_result = RESULTS_DIR / f"{result_stem}.csv"
-    log_file = RESULTS_DIR / "logs" / f"{result_stem}.log"
-    prepare_output(raw_result, final_result)
+    final_result = results_dir / f"{result_stem}.csv"
+    log_file = results_dir / "logs" / f"{result_stem}.log"
+    prepare_output(final_result)
 
     print(
         f"\nScenario={scenario}, policy={policy}, FoV={fov}, "
@@ -335,6 +351,8 @@ def run_experiment(scenario: str, policy: str, fov: str, deadline: int) -> None:
                 tiling_file,
                 source_tile,
                 remaining_time,
+                final_result,
+                results_dir,
                 log_stream,
             )
 
@@ -346,13 +364,10 @@ def run_experiment(scenario: str, policy: str, fov: str, deadline: int) -> None:
         raise RuntimeError(f"No maps were evaluated for {result_stem}")
     print(f"  completed {completed}/{len(maps)} maps", flush=True)
 
-    if not raw_result.is_file():
+    if not final_result.is_file():
         raise FileNotFoundError(
-            f"sp_verify did not create {raw_result}. Set the C++ out_file "
-            f"to {RAW_RESULT_NAME!r}."
+            f"sp_verify did not create the requested output file: {final_result}"
         )
-
-    shutil.move(str(raw_result), str(final_result))
 
 
 def main() -> int:
@@ -363,18 +378,21 @@ def main() -> int:
     for scenario in SCENARIOS:
         if scenario not in DEADLINES:
             raise KeyError(f"No deadline list configured for {scenario!r}")
-        if scenario not in UTILITY_ROOTS:
-            raise KeyError(f"No utility root configured for {scenario!r}")
-        if scenario not in BASELINE_ROOTS:
-            raise KeyError(f"No baseline root configured for {scenario!r}")
+        if scenario not in UTILITY_MAP_ROOTS:
+            raise KeyError(f"No utility map root configured for {scenario!r}")
+        if scenario not in UTILITY_STATS_ROOTS:
+            raise KeyError(f"No utility statistics root configured for {scenario!r}")
+        if scenario not in BASELINE_MAP_ROOTS:
+            raise KeyError(f"No baseline map root configured for {scenario!r}")
+        if scenario not in BASELINE_STATS_ROOTS:
+            raise KeyError(f"No baseline statistics root configured for {scenario!r}")
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (RESULTS_DIR / "logs").mkdir(parents=True, exist_ok=True)
+    SEARCH_RESULTS_ROOT.mkdir(parents=True, exist_ok=True)
 
     print(f"Scenarios: {', '.join(SCENARIOS)}")
     print(f"Policies: {', '.join(POLICIES)}")
     print(f"FoVs: {', '.join(FOVS)}")
-    print(f"Results: {RESULTS_DIR}")
+    print(f"Results: {SEARCH_RESULTS_ROOT}/searching_results_<fov>")
 
     for scenario in SCENARIOS:
         for policy in POLICIES:

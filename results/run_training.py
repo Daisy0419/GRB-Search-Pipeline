@@ -5,25 +5,26 @@ from __future__ import annotations
 
 import csv
 import shlex
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 
-
+# =============================================================================
 # Configuration -- edit only this section
+# =============================================================================
+
 REPO_ROOT = Path.home() / "GRB-Search-Pipeline"
 SEARCH_ROOT = REPO_ROOT / "search-planning"
 
-# telescope fields
+# Only these telescope fields of view are processed.
 FOVS = ["2.5x2.5", "5.36x4.5"]
 
 # Training-map directories for each transient scenario.
 # Change these paths if your generated maps are stored elsewhere.
 TRAINING_MAP_DIRS = {
-    "short": REPO_ROOT / "results" / "recomputed_results" / "training" / "maps" / "short",
-    "longlow": Path("/shared/training/longlow_maps"),
+    "short": REPO_ROOT / "results" / "training" / "maps" / "short",
+    "longlow": REPO_ROOT / "results" / "training" / "maps" / "longlow",
 }
 
 EXECUTABLE = SEARCH_ROOT / "build" / "sp_train"
@@ -35,10 +36,6 @@ W_MAX = 10.0
 W_ACC = 10.0
 DWELL_TIME = 5.0
 IS_DEEPSLOW = False
-
-# sp_train must append its output rows to this filename in its working
-# directory. The script moves the completed file to its final name.
-RAW_RESULT_NAME = "out.csv"
 
 # Set to an integer for a short test, for example MAX_MAPS = 5.
 MAX_MAPS: int | None = None
@@ -82,20 +79,21 @@ def load_source_tiles(csv_path: Path) -> dict[str, int]:
     return lookup
 
 
-def prepare_output(raw_result: Path, final_result: Path) -> None:
-    for path in (raw_result, final_result):
-        if path.exists():
-            if not OVERWRITE:
-                raise FileExistsError(
-                    f"Output already exists: {path}. Set OVERWRITE = True to replace it."
-                )
-            path.unlink()
+def prepare_output(result_file: Path) -> None:
+    if result_file.exists():
+        if not OVERWRITE:
+            raise FileExistsError(
+                f"Output already exists: {result_file}. "
+                "Set OVERWRITE = True to replace it."
+            )
+        result_file.unlink()
 
 
 def run_sp_train(
     map_file: Path,
     tiling_file: Path,
     source_tile: int,
+    result_file: Path,
     log_stream,
 ) -> None:
     command = [
@@ -107,6 +105,7 @@ def run_sp_train(
         str(W_ACC),
         str(DWELL_TIME),
         "1" if IS_DEEPSLOW else "0",
+        str(result_file),
     ]
 
     log_stream.write(f"\n$ {shlex.join(command)}\n")
@@ -141,10 +140,10 @@ def run_training_scenario(scenario: str, map_dir: Path) -> None:
         require_file(tiling_file, "Tiling file")
         source_tiles = load_source_tiles(source_tile_file)
 
-        raw_result = RESULTS_DIR / RAW_RESULT_NAME
-        final_result = RESULTS_DIR / f"{scenario}_{fov}_tiling.csv"
-        log_file = RESULTS_DIR / "logs" / f"{scenario}_{fov}_tiling.log"
-        prepare_output(raw_result, final_result)
+        result_stem = f"{scenario}_searching_{fov}_tiling"
+        final_result = RESULTS_DIR / f"{result_stem}.csv"
+        log_file = RESULTS_DIR / "logs" / f"{result_stem}.log"
+        prepare_output(final_result)
 
         print(f"FoV: {fov} -> {final_result}")
         with log_file.open("w", encoding="utf-8") as log_stream:
@@ -156,18 +155,21 @@ def run_training_scenario(scenario: str, map_dir: Path) -> None:
                         f"No source tile for {map_file.name!r} in {source_tile_file}"
                     ) from error
 
-                run_sp_train(map_file, tiling_file, source_tile, log_stream)
+                run_sp_train(
+                    map_file,
+                    tiling_file,
+                    source_tile,
+                    final_result,
+                    log_stream,
+                )
 
                 if index == 1 or index % 100 == 0 or index == len(maps):
                     print(f"  completed {index}/{len(maps)} maps", flush=True)
 
-        if not raw_result.is_file():
+        if not final_result.is_file():
             raise FileNotFoundError(
-                f"sp_train did not create {raw_result}. Set the C++ out_file "
-                f"to {RAW_RESULT_NAME!r}."
+                f"sp_train did not create the requested output file: {final_result}"
             )
-
-        shutil.move(str(raw_result), str(final_result))
 
 
 def main() -> int:

@@ -1,6 +1,9 @@
 .vscode
 build/
+cosipy/
+result/training/*
+validation/*
 .DS_Store
 *.pyc
 .ipynb_checkpoints/
-
+README_.md
