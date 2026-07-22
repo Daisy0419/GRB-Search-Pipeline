@@ -994,7 +994,7 @@ and writes the generated figures under:
 ~/GRB-Search-Pipeline/results/figures/
 ```
 
-## 4 Running the Mapping-Performance Benchmark (Option  L)
+## 4 Running the Mapping-Performance Benchmark (Optional)
 
 If you are interested in reproduce the result in section 4 Figure 4, the `dc3_benchmark.py` script compares the five likelihood-mapping implementations represented in the mapping-performance figure. The benchmark data is distributed inside the transient-data archive at:
 
