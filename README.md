@@ -31,8 +31,10 @@ Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
 
 ## System Requirements
 
+> **Architecture requirement:** This installation guide supports only Linux on the ARM64 (`aarch64`) architecture. The provided Conda environment is architecture-specific and will not work on Linux x86-64.
+
 - OS: Linux
-- Tested architecture: Linux ARM64 (`aarch64`)
+- Required architecture: ARM64 (`aarch64`)
 - Required command-line tools: Git, CMake, Make, a C++17 compiler with OpenMP support, `wget`, `curl`, and `tar`
 - Reference platform used in the paper: NVIDIA Jetson Orin NX
   - 8 ARM Cortex-A78AE v8.2 CPU cores
@@ -47,10 +49,9 @@ Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
   - Transients and models: approximately 30 GB
   - Generated maps: approximately 30 GB
 
-The provided `cosipy-312-deps.yaml` contains architecture-specific package builds from the ARM64 reference platform. Exact environment reproduction therefore requires Linux ARM64. An architecture-compatible environment file is required when running on Linux x86-64.
+The provided `cosipy-312-deps.yaml` contains package builds exported from the ARM64 reference platform. Therefore, the environment setup and commands below are intended only for Linux `aarch64`. Linux x86-64 and other architectures are not supported by this guide.
 
-
-The paper's timing results are **platform-sensitive**. Functional results may be reproduced on another Linux machine with a compatible environment, but direct comparisons with Figures 4-11 should use the reference Jetson configuration.
+The paper's timing results are **platform-sensitive**. The artifact may run functionally on another Linux `aarch64` machine, but direct timing comparisons with Figures 4-11 should use the reference Jetson configuration.
 
 
 ## Overview
@@ -161,49 +162,67 @@ git clone -b tsmap-artifact https://github.com/McKelvey-Engineering-CSE/cosipy.g
 
 #### 1.1.2 Python Environment Setup
 
-We recommend setting up a [conda](https://docs.conda.io/en/latest/) environment for Python.
+> **Architecture requirement:** This setup supports only Linux on the ARM64 (`aarch64`) architecture. The provided Conda environment will not work on Linux x86-64.
 
-If you do not have conda installed locally:
+Verify the machine architecture:
+
+```bash
+uname -m
+```
+
+The output must be:
+
+```text
+aarch64
+```
+
+Stop the installation if the machine does not use the supported architecture:
+
+```bash
+if [ "$(uname -m)" != "aarch64" ]; then
+    echo "ERROR: This artifact guide supports only Linux aarch64." >&2
+    exit 1
+fi
+```
+
+We recommend using [Conda](https://docs.conda.io/en/latest/) to configure the Python environment.
+
+If Conda is not already installed, download and install the Linux `aarch64` version of Miniconda. Change `~/conda` if you prefer another installation location.
 
 ```bash
 cd ~/GRB-Search-Pipeline
-```
-Download and install the Miniconda installer for the current Linux architecture (change `~/conda` to your preferred location):
 
-```bash
-export CONDA_DIR=~/conda
-
-case "$(uname -m)" in
-    x86_64)         export MINICONDA_ARCH=x86_64 ;;
-    aarch64|arm64)  export MINICONDA_ARCH=aarch64 ;;
-    *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-esac
+export CONDA_DIR="${HOME}/conda"
 
 wget -q \
-    "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${MINICONDA_ARCH}.sh" \
+    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh \
     -O miniconda.sh
+
 bash miniconda.sh -b -p "${CONDA_DIR}"
 rm miniconda.sh
 ```
 
-Make conda available in your shell
+Make Conda available in the current shell:
+
 ```bash
 . "${CONDA_DIR}/etc/profile.d/conda.sh"
 conda config --system --set channel_priority flexible
 ```
-Once Conda is available, create the Python environment using the provided YAML file:
+
+Create the Python environment using the provided ARM64-specific YAML file:
 
 ```bash
 cd ~/GRB-Search-Pipeline
 conda env create -f cosipy-312-deps.yaml
 ```
 
-The provided YAML contains ARM64-specific package builds. On x86-64, use an architecture-compatible environment file containing the same Python dependencies.
+Activate the `cosipy-312` environment:
 
-Activate **`cosipy-312`** for map generation and the other Python scripts:
 ```bash
 conda activate cosipy-312
 ```
+
+Install the artifact branch of COSIpy:
 
 ```bash
 cd ~/GRB-Search-Pipeline/cosipy
@@ -211,6 +230,11 @@ git switch tsmap-artifact
 
 python -m pip install "poetry-core>=2,<3"
 python -m pip install --no-deps -e .
+```
+
+Install Jupyter Notebook for result visualization:
+
+```bash
 python -m pip install notebook
 ```
 ---
@@ -491,18 +515,6 @@ mkdir -p \
     "${TRAINING_LOG_ROOT}"
 ```
 
-Verify the required inputs:
-
-```bash
-ls "${MAP_SCRIPT}"
-ls "${RESPONSE_MODEL}"
-ls "${BACKGROUND_MODEL}"
-ls "${SHORT_TRAINING_TRANSIENTS}"
-ls "${LONGLOW_TRAINING_TRANSIENTS}"
-ls "${SHORT_TEST_TRANSIENTS}"
-ls "${LONGLOW_TEST_TRANSIENTS}"
-```
-
 #### Step 2: Generate the Short-Transient Training Maps
 
 Run:
@@ -658,18 +670,6 @@ Use the training data generated in Phase A:
 export SHORT_MAPPING_TIMES="${TRAINING_ROOT}/short_mapping_time_stats.csv"
 export LONGLOW_MAPPING_TIMES="${TRAINING_ROOT}/longlow_mapping_time_stats.csv"
 export TRAINING_OUTCOMES_ROOT="${TRAINING_ROOT}"
-```
-
-Verify the selected files before continuing:
-
-```bash
-ls "${SHORT_MAPPING_TIMES}"
-ls "${LONGLOW_MAPPING_TIMES}"
-
-ls "${TRAINING_OUTCOMES_ROOT}/short_searching_2.5x2.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/short_searching_5.36x4.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/longlow_searching_2.5x2.5_tiling.csv"
-ls "${TRAINING_OUTCOMES_ROOT}/longlow_searching_5.36x4.5_tiling.csv"
 ```
 
 The validation output uses the same scenario/FoV directory names as `precomputed_results/validation/`, allowing the same visualization notebook to read either result tree.
@@ -965,5 +965,3 @@ and writes the generated figures under:
 ```text
 ~/GRB-Search-Pipeline/results/figures/
 ```
-
-Do not overwrite files under `~/GRB-Search-Pipeline/precomputed_results/`.
