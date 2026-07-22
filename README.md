@@ -31,7 +31,7 @@ Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
 
 ## System Requirements
 
-> **Architecture requirement:** This installation guide supports only Linux on the ARM64 (`aarch64`) architecture. The provided Conda environment is architecture-specific and will not work on Linux x86-64.
+> **Architecture requirement:** This installation guide supports only Linux on the ARM64 (`aarch64`) architecture. 
 
 - OS: Linux
 - Required architecture: ARM64 (`aarch64`)
@@ -487,6 +487,18 @@ Activate the Python environment:
 ```bash
 conda activate cosipy-312
 ```
+
+Before starting any map-generation Python process, set the numerical-library thread limits used for the paper experiments:
+
+```bash
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=8
+export OMP_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+```
+
+`OPENBLAS_NUM_THREADS` controls NumPy matrix operations and is distinct from the `-t 8` option, which controls the map-generation threads used directly by `map_adapt_transients.py`.
+
 
 Configure the repository, input-data, model, and output paths:
 
@@ -964,4 +976,73 @@ and writes the generated figures under:
 
 ```text
 ~/GRB-Search-Pipeline/results/figures/
+```
+
+## 4 Running the Mapping-Performance Benchmark (Option  L)
+
+If you are interested in reproduce the result in section 4 Figure 4, the `dc3_benchmark.py` script compares the five likelihood-mapping implementations represented in the mapping-performance figure. The benchmark data is distributed inside the transient-data archive at:
+
+```text
+~/transients/dc3_benchmark_data/
+```
+
+Update the COSIpy artifact branch and move to the directory containing the benchmark script:
+
+```bash
+conda activate cosipy-312
+```
+
+Verify the benchmark script and input directory:
+
+```bash
+export DC3_BENCHMARK_DATA="${HOME}/transients/dc3_benchmark_data"
+
+ls dc3_benchmark.py
+ls "${DC3_BENCHMARK_DATA}"
+```
+
+The thread-control environment variables must be set **before starting Python**, because NumPy initializes its numerical libraries when Python imports it. These settings are separate from the `-t` option used by `map_adapt_transients.py`.
+
+Set the common thread-control variables:
+
+```bash
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+```
+
+The benchmark modes are:
+
+| Mode | Implementation | `OPENBLAS_NUM_THREADS` | Platform support |
+| --- | --- | ---: | --- |
+| `cosipy_interp` | Original COSIpy interpolation mapper | `1` | Intel/x86 only |
+| `cosipy_numba` | Original COSIpy Numba mapper | `1` | Intel/x86 only |
+| `emsoft_outmem` | External-memory mapper | `8` | Linux `aarch64` |
+| `emsoft_inmem` | In-memory mapper | `8` | Linux `aarch64` |
+| `emsoft_moc` | In-memory multiresolution mapper | `8` | Linux `aarch64` |
+
+Because this artifact guide supports only Linux `aarch64`, run the three EMSOFT modes. The two original COSIpy modes are listed for correspondence with the Intel results in the paper but are not part of the supported ARM workflow.
+
+Create an output directory, set OpenBLAS to eight threads, and run the supported modes:
+
+```bash
+cd ~/GRB-Search-Pipeline/cosipy/cosipy/ts_map
+export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark"
+mkdir -p "${BENCHMARK_RESULTS}"
+
+export OPENBLAS_NUM_THREADS=8
+
+for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
+    echo "Running ${MODE}"
+    python dc3_benchmark.py \
+        -d "${DC3_BENCHMARK_DATA}" \
+        "${MODE}" \
+        | tee "${BENCHMARK_RESULTS}/${MODE}.txt"
+done
+```
+
+The benchmark assumes eight available CPU cores. Each reported time is averaged over five measured iterations following a warm-up iteration. Near the end of each run, the script prints a line such as:
+
+```text
+TIME: 0.402 s
 ```

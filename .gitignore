@@ -7,3 +7,4 @@ validation/*
 *.pyc
 .ipynb_checkpoints/
 README_.md
+templete.md
