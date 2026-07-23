@@ -971,14 +971,9 @@ searching_results_5.36x4.5/longlow_5.36x4.5_tiling_utility_110.csv
 
 #### Step 9: Aggregate and Visualize the Recomputed Results
 
-The recomputed `results/` directory follows the same training and validation layout as `precomputed_results/`. Therefore, use the same notebook and select the recomputed result root through `GRB_RESULTS_ROOT`:
-
 ```bash
 conda activate cosipy-312
-cd "${REPO_ROOT}/precomputed_results"
-
-GRB_RESULTS_ROOT="${REPO_ROOT}/results" \
-GRB_FIGURE_OUTPUT_DIR="${REPO_ROOT}/results/figures" \
+cd "${REPO_ROOT}/results"
 jupyter notebook visualize_Results.ipynb
 ```
 
