@@ -578,6 +578,9 @@ The generated mapping statistics are written to:
 ~/GRB-Search-Pipeline/results/training/short_mapping_time_stats.csv
 ```
 
+Due to the large number of simulated transients used, this step may
+require 8-12 hours on the ARM platform used for the paper.
+
 #### Step 3: Generate the Long-Transient Training Maps
 
 Run:
@@ -598,6 +601,9 @@ python "${MAP_SCRIPT}" \
 ```
 
 The likelihood maps are independent of the optical telescope FoV. Therefore, each training transient is mapped only once.
+
+Due to the large number of simulated transients used, this step may
+require 8-12 hours on the ARM platform used for the paper.
 
 #### Step 4: Run GCP on the Training Maps
 
@@ -784,6 +790,10 @@ done
 
 The `-s 10000` option selects 10,000 test transients. The explicit `-r 1957` option ensures that every run uses the same test subset.
 
+Again, due to the large number of transients tested, this step may
+require up to two hours *per deadline tested* for each transient
+set/FoV combination on the reference ARM platform.
+
 #### Step 7: Generate Deadline-Oblivious and Ground-Truth Test Maps
 
 The `nodeadline` and `gt` endpoint modes do not use the utility training tables and do not depend on FoV. Generate each once per transient scenario.
@@ -865,6 +875,10 @@ results/validation/mapping_stats/
 ```
 
 The `maps/` and `logs/` directories use the same six case names. This matches the case naming under `precomputed_results/validation/mapping_stats/`.
+
+Again, due to the large number of transients tested, this step may
+require up to two hours for each transient set/FoV combination on the
+reference ARM platform.
 
 #### Step 8: Run GCP and Simulate the Search
 
