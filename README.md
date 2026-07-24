@@ -570,6 +570,7 @@ python "${MAP_SCRIPT}" \
 ```
 
 The command processes all 52,800 short training transients. Do not use `-s 10000` during training.
+If errors encountered, please go to `~/GRB-Search-Pipeline/results/training/logs/*.log` file for details.
 
 The options specify:
 
@@ -654,9 +655,10 @@ export HDF5_PLUGIN_PATH="$(
 export LD_LIBRARY_PATH="${HOME}/hdf5/lib:${LD_LIBRARY_PATH:-}"
 ```
 
-From the directory containing `run_training.py`, run:
+Go to the directory containing `run_training.py`, run:
 
 ```bash
+cd ~/GRB-Search-Pipeline/results
 python run_training.py
 ```
 
@@ -790,6 +792,7 @@ done
 ```
 
 The `-s 10000` option selects 10,000 test transients. The explicit `-r 1957` option ensures that every run uses the same test subset.
+If errors are encountered, please go to corresponding `*.log` file for details.
 
 #### Step 7: Generate Deadline-Oblivious Test Maps (~ 1 hours)
 
@@ -882,6 +885,7 @@ search-planning/tilings/source_tile_validation/
 ```
 
 Open `run_validation.py` and configure:
+(The default configuration exactly produces the results in the paper, keep them as they are if you don't want to make any change.)
 
 ```python
 SCENARIOS = ["short", "longlow"]
@@ -935,6 +939,7 @@ export LD_LIBRARY_PATH="${HOME}/hdf5/lib:${LD_LIBRARY_PATH:-}"
 From the directory containing `run_validation.py`, run:
 
 ```bash
+cd ~/GRB-Search-Pipeline/results
 python run_validation.py
 ```
 
