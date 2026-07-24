@@ -24,23 +24,30 @@ Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
   - [3.2 Phase B: Evaluate the Policies](#32-phase-b-evaluate-the-policies)
     - [Step 5: Configure the Evaluation Inputs](#step-5-configure-the-evaluation-inputs)
     - [Step 6: Generate Utility-Guided Test Maps](#step-6-generate-utility-guided-test-maps)
-    - [Step 7: Generate Deadline-Oblivious and Ground-Truth Test Maps](#step-7-generate-deadline-oblivious-and-ground-truth-test-maps)
+    - [Step 7: Generate Deadline-Oblivious Test Maps](#step-7-generate-deadline-oblivious-test-maps)
     - [Step 8: Run GCP and Simulate the Search](#step-8-run-gcp-and-simulate-the-search)
     - [Step 9: Aggregate and Visualize the Recomputed Results](#step-9-aggregate-and-visualize-the-recomputed-results)
+- [4 Running the Mapping-Performance Benchmark (Optional)](#4-running-the-mapping-performance-benchmark-optional)
+  - [4.1 Intel x86-64 Environment Setup](#41-intel-x86-64-environment-setup)
+  - [4.2 Run the Intel Benchmarks](#42-run-the-intel-benchmarks)
+  - [4.3 Run the Jetson Benchmarks](#43-run-the-jetson-benchmarks)
 
 
 ## System Requirements
 
-> **Architecture requirement:** This installation guide supports only Linux on the ARM64 (`aarch64`) architecture. 
+> **Architecture note:** Sections 1-3 support the complete artifact workflow on Linux ARM64 (`aarch64`). Section 4 additionally provides a Linux x86-64 environment for reproducing the Intel measurements in Figure 4.
 
 - OS: Linux
-- Required architecture: ARM64 (`aarch64`)
+- Supported architectures:
+  - ARM64 (`aarch64`) for the complete training and evaluation workflow and the Jetson benchmarks
+  - Intel/AMD x86-64 for the optional Intel benchmarks in Section 4
 - Required command-line tools: Git, CMake, Make, a C++17 compiler with OpenMP support, `wget`, `curl`, and `tar`
 - Reference platform used in the paper: NVIDIA Jetson Orin NX
   - 8 ARM Cortex-A78AE v8.2 CPU cores
   - CPU frequency fixed at 1.5 GHz
   - 16 GB DRAM
   - GPU not used
+- Reference Intel platform used for Figure 4: 2.3 GHz Intel Xeon Gold 5118 with 256 GB DRAM
 - Required storage after extraction: **at least 65 GB**, plus temporary space for the downloaded archive
   - Repository: 200 MB
   - Miniconda: 800 MB
@@ -49,9 +56,9 @@ Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
   - Transients and models: approximately 30 GB
   - Generated maps: approximately 30 GB
 
-The provided `cosipy-312-deps.yaml` contains package builds exported from the ARM64 reference platform. Therefore, the environment setup and commands below are intended only for Linux `aarch64`. Linux x86-64 and other architectures are not supported by this guide.
+The provided `cosipy-312-deps.yaml` contains packages exported from the ARM64 reference platform and is used in Sections 1-3. The separate `cosipy-312-intel.yml` file is used only for the Intel benchmark workflow in Section 4.
 
-The paper's timing results are **platform-sensitive**. The artifact may run functionally on another Linux `aarch64` machine, but direct timing comparisons with Figures 4-11 should use the reference Jetson configuration.
+The paper's timing results are **platform-sensitive**. Direct timing comparisons should use the corresponding reference platform: the Intel Xeon platform or Jetson Orin NX for Figure 4, and the Jetson Orin NX for the remaining timing experiments.
 
 
 ## Overview
@@ -123,12 +130,13 @@ The artifact uses the source repository and downloaded transient-data directory 
 |   |   |-- include/                 # C++ header files
 |   |   |-- src/                     # C++ source files
 |   |   |-- tilings/                 # FoV tilings and source-tile tables
-|   |   |-- build/                   # sp_train and sp_verify executables
+|   |   `-- build/                   # sp_train and sp_verify executables
+|   |-- results/                     # Newly generated outputs and figures
 |   |   |-- run_training.py          # Runs GCP on training maps
 |   |   `-- run_validation.py        # Evaluates generated test maps
-|   |-- results/                     # Newly generated outputs and figures
 |   |-- precomputed_results/         # Distributed results and visualization notebook
 |   |-- cosipy-312-deps.yaml         # Python environment configuration
+|   |-- cosipy-312-intel.yml         # Intel benchmark environment
 |   `-- README.md                    # Artifact instructions
 `-- transients/                      # Downloaded models and transient datasets
     |-- models/
@@ -163,7 +171,7 @@ git clone -b tsmap-artifact https://github.com/McKelvey-Engineering-CSE/cosipy.g
 
 #### 1.1.2 Python Environment Setup
 
-> **Architecture requirement:** This setup supports only Linux on the ARM64 (`aarch64`) architecture. The provided Conda installation and yaml configuration file will not work on Linux x86-64.
+> **Architecture requirement:** This subsection configures the ARM64 (`aarch64`) environment used for Sections 1-3. For the optional Intel/x86-64 benchmark, use the separate environment instructions in Section 4.1.
 
 Verify the machine architecture:
 
@@ -181,7 +189,7 @@ Stop the installation if the machine does not use the supported architecture:
 
 ```bash
 if [ "$(uname -m)" != "aarch64" ]; then
-    echo "ERROR: This artifact guide supports only Linux aarch64." >&2
+    echo "ERROR: Sections 1-3 require Linux aarch64." >&2
     exit 1
 fi
 ```
@@ -578,9 +586,6 @@ The generated mapping statistics are written to:
 ~/GRB-Search-Pipeline/results/training/short_mapping_time_stats.csv
 ```
 
-Due to the large number of simulated transients used, this step may
-require 8-12 hours on the ARM platform used for the paper.
-
 #### Step 3: Generate the Long-Transient Training Maps
 
 Run:
@@ -601,9 +606,6 @@ python "${MAP_SCRIPT}" \
 ```
 
 The likelihood maps are independent of the optical telescope FoV. Therefore, each training transient is mapped only once.
-
-Due to the large number of simulated transients used, this step may
-require 8-12 hours on the ARM platform used for the paper.
 
 #### Step 4: Run GCP on the Training Maps
 
@@ -790,13 +792,9 @@ done
 
 The `-s 10000` option selects 10,000 test transients. The explicit `-r 1957` option ensures that every run uses the same test subset.
 
-Again, due to the large number of transients tested, this step may
-require up to two hours *per deadline tested* for each transient
-set/FoV combination on the reference ARM platform.
+#### Step 7: Generate Deadline-Oblivious Test Maps
 
-#### Step 7: Generate Deadline-Oblivious and Ground-Truth Test Maps
-
-The `nodeadline` and `gt` endpoint modes do not use the utility training tables and do not depend on FoV. Generate each once per transient scenario.
+The `nodeadline` endpoint mode does not use the utility training tables and does not depend on FoV. Generate it once per transient scenario, then reuse the resulting maps for both FoVs and every deadline.
 
 For short transients, run:
 
@@ -811,22 +809,20 @@ mkdir -p \
     "${STATS_CASE_ROOT}" \
     "${LOG_CASE_ROOT}"
 
-for MODE in nodeadline gt; do
-    env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
-    python "${MAP_SCRIPT}" \
-        --response "${RESPONSE_MODEL}" \
-        --bkg-model "${BACKGROUND_MODEL}" \
-        -t 8 \
-        -n 64 \
-        -s 10000 \
-        -r 1957 \
-        "${SHORT_TEST_TRANSIENTS}" \
-        "${MODE}" \
-        -m \
-        -o "${MAP_CASE_ROOT}/emsoft_maps_${MODE}" \
-        > "${STATS_CASE_ROOT}/emsoft_stats_${MODE}.csv" \
-        2> "${LOG_CASE_ROOT}/emsoft_maps_${MODE}.log"
-done
+env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    -s 10000 \
+    -r 1957 \
+    "${SHORT_TEST_TRANSIENTS}" \
+    nodeadline \
+    -m \
+    -o "${MAP_CASE_ROOT}/emsoft_maps_nodeadline" \
+    > "${STATS_CASE_ROOT}/emsoft_stats_nodeadline.csv" \
+    2> "${LOG_CASE_ROOT}/emsoft_maps_nodeadline.log"
 ```
 
 For longlow transients, run:
@@ -842,25 +838,21 @@ mkdir -p \
     "${STATS_CASE_ROOT}" \
     "${LOG_CASE_ROOT}"
 
-for MODE in nodeadline gt; do
-    env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
-    python "${MAP_SCRIPT}" \
-        --response "${RESPONSE_MODEL}" \
-        --bkg-model "${BACKGROUND_MODEL}" \
-        -t 8 \
-        -n 64 \
-        -s 10000 \
-        -r 1957 \
-        "${LONGLOW_TEST_TRANSIENTS}" \
-        "${MODE}" \
-        -m \
-        -o "${MAP_CASE_ROOT}/emsoft_maps_${MODE}" \
-        > "${STATS_CASE_ROOT}/emsoft_stats_${MODE}.csv" \
-        2> "${LOG_CASE_ROOT}/emsoft_maps_${MODE}.log"
-done
+env -u LD_LIBRARY_PATH -u HDF5_PLUGIN_PATH \
+python "${MAP_SCRIPT}" \
+    --response "${RESPONSE_MODEL}" \
+    --bkg-model "${BACKGROUND_MODEL}" \
+    -t 8 \
+    -n 64 \
+    -s 10000 \
+    -r 1957 \
+    "${LONGLOW_TEST_TRANSIENTS}" \
+    nodeadline \
+    -m \
+    -o "${MAP_CASE_ROOT}/emsoft_maps_nodeadline" \
+    > "${STATS_CASE_ROOT}/emsoft_stats_nodeadline.csv" \
+    2> "${LOG_CASE_ROOT}/emsoft_maps_nodeadline.log"
 ```
-
-The `gt` mode uses the true transient duration and is included only as a ground-truth reference. It is not an implementable runtime policy.
 
 After Steps 6 and 7, the generated mapping statistics are organized as:
 
@@ -875,10 +867,6 @@ results/validation/mapping_stats/
 ```
 
 The `maps/` and `logs/` directories use the same six case names. This matches the case naming under `precomputed_results/validation/mapping_stats/`.
-
-Again, due to the large number of transients tested, this step may
-require up to two hours for each transient set/FoV combination on the
-reference ARM platform.
 
 #### Step 8: Run GCP and Simulate the Search
 
@@ -898,7 +886,7 @@ Open `run_validation.py` and configure:
 
 ```python
 SCENARIOS = ["short", "longlow"]
-POLICIES = ["utility", "nodeadline", "gt"]
+POLICIES = ["utility", "nodeadline"]
 FOVS = ["2.5x2.5", "5.36x4.5"]
 
 DEADLINES = {
@@ -979,7 +967,7 @@ Examples include:
 ```text
 searching_results_2.5x2.5/short_2.5x2.5_tiling_utility_10.csv
 searching_results_5.36x4.5/short_5.36x4.5_tiling_nodeadline_30.csv
-searching_results_2.5x2.5/longlow_2.5x2.5_tiling_gt_60.csv
+searching_results_2.5x2.5/longlow_2.5x2.5_tiling_nodeadline_60.csv
 searching_results_5.36x4.5/longlow_5.36x4.5_tiling_utility_110.csv
 ```
 
@@ -1002,35 +990,109 @@ and writes the generated figures under:
 ```text
 ~/GRB-Search-Pipeline/results/figures/
 ```
+
 ## 4 Running the Mapping-Performance Benchmark (Optional)
 
-This optional benchmark reproduces the mapping-time measurements underlying Figure 4 in Section IV-B of the paper. The supported Linux `aarch64` workflow reproduces the three Jetson results: `ext-mem`, `in-mem`, and `in-mem-mr`.
+This optional benchmark reproduces the mapping-time measurements in Figure 4. The complete figure contains five measurements on a 2.3 GHz Intel Xeon Gold 5118 system and three measurements on the Jetson Orin NX. Run the commands for each platform whose results you want to reproduce.
 
-The benchmark inputs are provided under:
+The five benchmark modes correspond to Figure 4 as follows:
+
+| Benchmark mode | Figure 4 label | Intel | Jetson |
+| --- | --- | :---: | :---: |
+| `cosipy_interp` | `cosipy v3` | yes | — |
+| `cosipy_numba` | `cosipy + JIT` | yes | — |
+| `emsoft_outmem` | `ext-mem` | yes | yes |
+| `emsoft_inmem` | `in-mem` | yes | yes |
+| `emsoft_moc` | `in-mem-mr` | yes | yes |
+
+The two original COSIpy implementations require more memory than is available on the 16 GB Jetson and therefore appear only in the Intel results.
+
+### 4.1 Intel x86-64 Environment Setup
+
+Use this environment only for the Intel/x86-64 benchmark. Verify that the machine reports `x86_64`:
+
+```bash
+uname -m
+```
+
+If Conda is not installed, install the x86-64 version of Miniconda:
+
+```bash
+cd ~/GRB-Search-Pipeline
+
+export CONDA_DIR="${HOME}/conda-intel"
+
+wget -q \
+    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    -O miniconda-intel.sh
+
+bash miniconda-intel.sh -b -p "${CONDA_DIR}"
+rm miniconda-intel.sh
+```
+
+Create and activate the Intel Python environment:
+
+```bash
+. "${CONDA_DIR}/etc/profile.d/conda.sh"
+
+cd ~/GRB-Search-Pipeline
+conda env create -f cosipy-312-intel.yml
+conda activate cosipy-312-intel
+```
+
+Install the artifact branch of COSIpy:
+
+```bash
+cd ~/GRB-Search-Pipeline/cosipy
+git switch tsmap-artifact
+git pull --ff-only
+
+python -m pip install "poetry-core>=2,<3"
+python -m pip install --no-deps -e .
+```
+
+### 4.2 Run the Intel Benchmarks
+
+The benchmark inputs are provided in the downloaded data archive at:
 
 ```text
 ~/transients/dc3_benchmark_data/
 ```
 
-Activate the environment, move to the benchmark directory, and configure the required thread settings before starting Python:
+Configure the paths and common thread settings. These variables must be set before Python starts:
 
 ```bash
-conda activate cosipy-312
+conda activate cosipy-312-intel
 cd ~/GRB-Search-Pipeline/cosipy/cosipy/ts_map
 
 export DC3_BENCHMARK_DATA="${HOME}/transients/dc3_benchmark_data"
-export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark"
+export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark/intel"
 mkdir -p "${BENCHMARK_RESULTS}"
 
 export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=8
 export OMP_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 ```
 
-Run the three implementations measured on the Jetson:
+Run the two original COSIpy modes with one OpenBLAS thread:
 
 ```bash
+export OPENBLAS_NUM_THREADS=1
+
+for MODE in cosipy_interp cosipy_numba; do
+    echo "Running ${MODE}"
+    python dc3_benchmark.py \
+        -d "${DC3_BENCHMARK_DATA}" \
+        "${MODE}" \
+        | tee "${BENCHMARK_RESULTS}/${MODE}.txt"
+done
+```
+
+Run the three EMSOFT modes with eight OpenBLAS threads:
+
+```bash
+export OPENBLAS_NUM_THREADS=8
+
 for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
     echo "Running ${MODE}"
     python dc3_benchmark.py \
@@ -1040,17 +1102,34 @@ for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
 done
 ```
 
-The modes correspond to Figure 4 as follows:
+### 4.3 Run the Jetson Benchmarks
 
-| Benchmark mode | Figure 4 label |
-| --- | --- |
-| `emsoft_outmem` | `ext-mem` |
-| `emsoft_inmem` | `in-mem` |
-| `emsoft_moc` | `in-mem-mr` |
+Use the ARM64 environment configured in Section 1.1.2, then run the three EMSOFT modes:
 
-The benchmark uses eight CPU cores and reports the average of five measured iterations after one warm-up iteration:
+```bash
+conda activate cosipy-312
+cd ~/GRB-Search-Pipeline/cosipy/cosipy/ts_map
+
+export DC3_BENCHMARK_DATA="${HOME}/transients/dc3_benchmark_data"
+export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark/jetson"
+mkdir -p "${BENCHMARK_RESULTS}"
+
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=8
+export OMP_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
+    echo "Running ${MODE}"
+    python dc3_benchmark.py \
+        -d "${DC3_BENCHMARK_DATA}" \
+        "${MODE}" \
+        | tee "${BENCHMARK_RESULTS}/${MODE}.txt"
+done
+```
+
+The benchmark uses eight CPU cores. Each run reports the average of five measured iterations after one warm-up iteration:
 
 ```text
 TIME: 0.402 s
 ```
-

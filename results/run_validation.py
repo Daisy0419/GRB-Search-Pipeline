@@ -44,7 +44,7 @@ UTILITY_STATS_ROOTS = {
     "longlow": str(MAPPING_STATS_ROOT / "{fov}_longlow"),
 }
 
-# The nodeadline and gt maps are independent of FoV and reused for both FoVs.
+# The nodeadline maps are independent of FoV and reused for both FoVs.
 BASELINE_MAP_ROOTS = {
     "short": MAP_ROOT / "no-fov_short",
     "longlow": MAP_ROOT / "no-fov_longlow",
@@ -396,7 +396,7 @@ def main() -> int:
 
     for scenario in SCENARIOS:
         for policy in POLICIES:
-            if policy not in {"utility", "nodeadline", "gt"}:
+            if policy not in {"utility", "nodeadline"}:
                 raise ValueError(f"Unsupported policy: {policy!r}")
             for fov in FOVS:
                 for deadline in DEADLINES[scenario]:
