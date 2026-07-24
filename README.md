@@ -512,13 +512,12 @@ Activate the Python environment:
 conda activate cosipy-312
 ```
 
-Before starting any map-generation Python process, set the numerical-library thread limits used for the paper experiments:
+Before starting any map-generation Python process, set the numerical-library thread limits used for the paper experiments. Here, we assume that NumPy was built to use the OpenBLAS library for multithreaded linear algebra, rather than the alternative OpenMP or MKL libraries.
 
 ```bash
-export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=8
+export MKL_NUM_THREADS=1
 export OMP_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
 ```
 
 `OPENBLAS_NUM_THREADS` controls NumPy matrix operations and is distinct from the `-t 8` option, which controls the map-generation threads used directly by `map_adapt_transients.py`.
