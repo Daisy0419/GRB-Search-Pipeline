@@ -1051,7 +1051,7 @@ python -m pip install "poetry-core>=2,<3"
 python -m pip install --no-deps -e .
 ```
 
-### 4.2 Run the Intel Benchmarks (~ 10 minutes)
+### 4.2 Run the Intel Benchmarks (~ 20 minutes)
 
 The benchmark inputs are provided in the downloaded data archive at:
 
@@ -1088,7 +1088,7 @@ for MODE in cosipy_interp cosipy_numba; do
 done
 ```
 
-Run the three EMSOFT modes with eight OpenBLAS threads:
+Run the three EMSOFT modes with eight OpenBLAS threads. (The EMSOFT modes use a single process, so the number of processors used remains the same):
 
 ```bash
 export OPENBLAS_NUM_THREADS=8
@@ -1104,7 +1104,7 @@ done
 
 ### 4.3 Run the Jetson Benchmarks (~ 10 minutes)
 
-Use the ARM64 environment configured in Section 1.1.2, then run the three EMSOFT modes:
+Use the ARM64 environment configured in Section 1.1.2, then run the three EMSOFT modes.
 
 ```bash
 conda activate cosipy-312
