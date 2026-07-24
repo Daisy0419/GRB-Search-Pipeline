@@ -1074,7 +1074,7 @@ export OMP_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 ```
 
-Run the two original COSIpy modes with one OpenBLAS thread:
+Run the two original COSIpy modes with one OpenBLAS thread. (The COSIpy modes use Python multiprocessing to start eight separate processes, so they still use eight processors, with one OpenBLAS thread in each):
 
 ```bash
 export OPENBLAS_NUM_THREADS=1
