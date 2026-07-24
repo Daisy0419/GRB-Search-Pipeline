@@ -551,7 +551,7 @@ mkdir -p \
     "${TRAINING_LOG_ROOT}"
 ```
 
-#### Step 2: Generate the Short-Transient Training Maps
+#### Step 2: Generate the Short-Transient Training Maps (~ 4 hours)
 
 Run:
 
@@ -586,7 +586,7 @@ The generated mapping statistics are written to:
 ~/GRB-Search-Pipeline/results/training/short_mapping_time_stats.csv
 ```
 
-#### Step 3: Generate the Long-Transient Training Maps
+#### Step 3: Generate the Long-Transient Training Maps (~ 4 hours)
 
 Run:
 
@@ -607,7 +607,7 @@ python "${MAP_SCRIPT}" \
 
 The likelihood maps are independent of the optical telescope FoV. Therefore, each training transient is mapped only once.
 
-#### Step 4: Run GCP on the Training Maps
+#### Step 4: Run GCP on the Training Maps (~ 10 hours)
 
 Run GCP on every generated training map for the following four scenario/FoV combinations:
 
@@ -710,7 +710,7 @@ export TRAINING_OUTCOMES_ROOT="${TRAINING_ROOT}"
 
 The validation output uses the same scenario/FoV directory names as `precomputed_results/validation/`, allowing the same visualization notebook to read either result tree.
 
-#### Step 6: Generate Utility-Guided Test Maps
+#### Step 6: Generate Utility-Guided Test Maps (~ 10 hours)
 
 Utility-guided mapping depends on the telescope FoV because each FoV uses a different GCP training-outcome table. Generate a separate set of test maps for every FoV and deadline.
 
@@ -792,7 +792,7 @@ done
 
 The `-s 10000` option selects 10,000 test transients. The explicit `-r 1957` option ensures that every run uses the same test subset.
 
-#### Step 7: Generate Deadline-Oblivious Test Maps
+#### Step 7: Generate Deadline-Oblivious Test Maps (~ 1 hours)
 
 The `nodeadline` endpoint mode does not use the utility training tables and does not depend on FoV. Generate it once per transient scenario, then reuse the resulting maps for both FoVs and every deadline.
 
@@ -868,7 +868,7 @@ results/validation/mapping_stats/
 
 The `maps/` and `logs/` directories use the same six case names. This matches the case naming under `precomputed_results/validation/mapping_stats/`.
 
-#### Step 8: Run GCP and Simulate the Search
+#### Step 8: Run GCP and Simulate the Search (~ 10 hours)
 
 The `run_validation.py` script evaluates the generated test maps using the `sp_verify` executable. It passes the appropriate FoV-specific result CSV path directly to each `sp_verify` invocation.
 
@@ -971,7 +971,7 @@ searching_results_2.5x2.5/longlow_2.5x2.5_tiling_nodeadline_60.csv
 searching_results_5.36x4.5/longlow_5.36x4.5_tiling_utility_110.csv
 ```
 
-#### Step 9: Aggregate and Visualize the Recomputed Results
+#### Step 9: Aggregate and Visualize the Recomputed Results (~ 10 minutes)
 
 ```bash
 conda activate cosipy-312
@@ -1007,7 +1007,7 @@ The five benchmark modes correspond to Figure 4 as follows:
 
 The two original COSIpy implementations require more memory than is available on the 16 GB Jetson and therefore appear only in the Intel results.
 
-### 4.1 Intel x86-64 Environment Setup
+### 4.1 Intel x86-64 Environment Setup 
 
 Use this environment only for the Intel/x86-64 benchmark. Verify that the machine reports `x86_64`:
 
@@ -1051,7 +1051,7 @@ python -m pip install "poetry-core>=2,<3"
 python -m pip install --no-deps -e .
 ```
 
-### 4.2 Run the Intel Benchmarks
+### 4.2 Run the Intel Benchmarks (~ 10 minutes)
 
 The benchmark inputs are provided in the downloaded data archive at:
 
@@ -1102,7 +1102,7 @@ for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
 done
 ```
 
-### 4.3 Run the Jetson Benchmarks
+### 4.3 Run the Jetson Benchmarks (~ 10 minutes)
 
 Use the ARM64 environment configured in Section 1.1.2, then run the three EMSOFT modes:
 
