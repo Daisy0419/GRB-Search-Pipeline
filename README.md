@@ -1075,9 +1075,6 @@ export DC3_BENCHMARK_DATA="${HOME}/transients/dc3_benchmark_data"
 export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark/intel"
 mkdir -p "${BENCHMARK_RESULTS}"
 
-export MKL_NUM_THREADS=1
-export OMP_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
 ```
 
 Run the two original COSIpy modes with one OpenBLAS thread. (The COSIpy modes use Python multiprocessing to start eight separate processes, so they still use eight processors, with one OpenBLAS thread in each):
@@ -1120,10 +1117,7 @@ export DC3_BENCHMARK_DATA="${HOME}/transients/dc3_benchmark_data"
 export BENCHMARK_RESULTS="${HOME}/GRB-Search-Pipeline/results/dc3_benchmark/jetson"
 mkdir -p "${BENCHMARK_RESULTS}"
 
-export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=8
-export OMP_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
 
 for MODE in emsoft_outmem emsoft_inmem emsoft_moc; do
     echo "Running ${MODE}"
