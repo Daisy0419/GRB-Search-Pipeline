@@ -4,6 +4,10 @@ This repository contains the source code, processed datasets, and analysis tools
 
 Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
 
+Artifact dataset: https://zenodo.org/records/21497891 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21497891.svg)](https://doi.org/10.5281/zenodo.21497891)
+
+Artifact documentation: [`INSTALL`](INSTALL.md), [`REQUIREMENTS`](REQUIREMENTS.md), [`STATUS`](STATUS.md), and [`LICENSE`](LICENSE.md). The paper is included as [`paper.pdf`](paper.pdf).
+
 ## Table of Contents
 
 - [System Requirements](#system-requirements)
@@ -137,7 +141,12 @@ The artifact uses the source repository and downloaded transient-data directory 
 |   |-- precomputed_results/         # Distributed results and visualization notebook
 |   |-- cosipy-312-deps.yaml         # Python environment configuration
 |   |-- cosipy-312-intel.yml         # Intel benchmark environment
-|   `-- README.md                    # Artifact instructions
+|   |-- INSTALL.md                   # Brief installation and smoke-test instructions
+|   |-- LICENSE.md                   # License placeholder
+|   |-- README.md                    # Complete artifact and reproduction instructions
+|   |-- REQUIREMENTS.md              # Hardware and software requirements
+|   |-- STATUS.md                    # Requested badges and artifact scope
+|   `-- paper.pdf                    # Latest paper version
 `-- transients/                      # Downloaded models and transient datasets
     |-- models/
     |-- emsoft_training_short/
@@ -470,7 +479,7 @@ After successful extraction and verification, the downloaded archive may be remo
 rm "${HOME}/transients.tar.gz"
 ```
 
---- 
+---
 
 ## 2 Reproducing Paper Figures
 
