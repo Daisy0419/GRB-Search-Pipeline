@@ -9,12 +9,12 @@ The corresponding information for this artifact is provided below.
 - **Source-code and instructions repository (includes README, REQUIREMENTS, etc.):**  
   https://github.com/Daisy0419/GRB-Search-Pipeline.git
 
+- **Software artifact:** 
+  https://zenodo.org/records/21572120 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21572120.svg)](https://doi.org/10.5281/zenodo.21572120)
+
 - **Artifact dataset:**  
   https://zenodo.org/records/21497891  
   [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21497891.svg)](https://doi.org/10.5281/zenodo.21497891)
-
-- **Version-specific Zenodo artifact snapshot:**  
-  *Under preparation (we will notify the chairs shortly).*
 
 **Note**: Please visit the **GitHub repo** above as the initial step, and its **README.md** file in particular.
 
