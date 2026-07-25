@@ -4,6 +4,8 @@ This repository contains the source code, processed datasets, and analysis tools
 
 Repository: https://github.com/Daisy0419/GRB-Search-Pipeline.git
 
+Software artifact: https://zenodo.org/records/21572120 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21572120.svg)](https://doi.org/10.5281/zenodo.21572120)
+
 Artifact dataset: https://zenodo.org/records/21497891 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21497891.svg)](https://doi.org/10.5281/zenodo.21497891)
 
 Artifact documentation: [`INSTALL`](INSTALL.md), [`REQUIREMENTS`](REQUIREMENTS.md), [`STATUS`](STATUS.md), and [`LICENSE`](LICENSE.md). The paper is included as [`paper.pdf`](paper.pdf).

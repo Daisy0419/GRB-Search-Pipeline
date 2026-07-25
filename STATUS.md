@@ -21,8 +21,7 @@ The artifact consists of two persistently archived components:
 
 The corresponding persistent identifiers are:
 
-> **Artifact DOI:** TODO
->
+> **Artifact DOI:** https://doi.org/10.5281/zenodo.21572120
 > **Artifact Dataset DOI:** https://doi.org/10.5281/zenodo.21497891
 
 Continued development will take place in the following GitHub repository:
