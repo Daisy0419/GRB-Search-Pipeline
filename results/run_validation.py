@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import re
 import shlex
 import subprocess
@@ -16,7 +17,14 @@ from pathlib import Path
 # Configuration -- edit only this section
 # =============================================================================
 
-REPO_ROOT = Path.home() / "GRB-Search-Pipeline"
+# Use the exported workspace path when available. Otherwise, infer the
+# repository root from results/run_validation.py.
+REPO_ROOT = Path(
+    os.environ.get(
+        "REPO_ROOT",
+        str(Path(__file__).resolve().parents[1]),
+    )
+).expanduser().resolve()
 SEARCH_ROOT = REPO_ROOT / "search-planning"
 
 # Only the listed scenarios, policies, and FoVs are processed.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import shlex
 import subprocess
 import sys
@@ -14,7 +15,14 @@ from pathlib import Path
 # Configuration -- edit only this section
 # =============================================================================
 
-REPO_ROOT = Path.home() / "GRB-Search-Pipeline"
+# Use the exported workspace path when available. Otherwise, infer the
+# repository root from results/run_training.py.
+REPO_ROOT = Path(
+    os.environ.get(
+        "REPO_ROOT",
+        str(Path(__file__).resolve().parents[1]),
+    )
+).expanduser().resolve()
 SEARCH_ROOT = REPO_ROOT / "search-planning"
 
 # Only these telescope fields of view are processed.
@@ -34,6 +42,8 @@ RESULTS_DIR = REPO_ROOT / "results" / "training"
 
 W_MAX = 10.0
 W_ACC = 10.0
+# Preserve the value used by the existing GCP training workflow. Keep this
+# aligned with the search-time model used to generate the paper's tables.
 DWELL_TIME = 5.0
 IS_DEEPSLOW = False
 
